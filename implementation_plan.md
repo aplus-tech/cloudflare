@@ -24,6 +24,8 @@
     *   手動建立 `package.json`, `svelte.config.js`, `wrangler.toml` (已完成)。
     *   配置 D1 綁定: `database_name = "wordpress-cloudflare"`, `database_id = "a061682a-515f-4fde-9b80-273632eb0e04"` (已完成)。
     *   **執行安裝**: 本地安裝 `npm install` (已完成)。
+    *   **GitHub 連線**: 成功將代碼推送到 GitHub 並連線至 Cloudflare Pages (已完成)。
+    *   **成功部署**: 獲得部署網址 `cloudflare-9qe.pages.dev` (已完成)。
 2.  **配置 D1 數據庫**:
     *   建立 D1: `npx wrangler d1 create wordpress-cloudflare` (已完成)。
     *   應用 Schema: 使用 `schema.sql` 執行 `npx wrangler d1 execute wordpress-cloudflare --remote --file=./schema.sql` (已完成)。

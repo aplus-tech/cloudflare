@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Architecture Update**: Expanded D1 Schema to 10 tables. Added `sync_terms` for full taxonomy support (Brands, Attributes, Tags, Cats). Updated `sync_products` and `sync_posts` to include JSON fields for attributes and term relationships.
 - **Database Config**: Updated D1 database name to `wordpress-cloudflare` and ID to `a061682a-515f-4fde-9b80-273632eb0e04`.
 - **Phase 3: Edge Cache**: Implemented KV-based HTML caching in `hooks.server.ts` and created a WordPress purge plugin (`wp-cache-purge.php`).
+- **Deployment**: Successfully connected GitHub repo and deployed to Cloudflare Pages.
 
 ### Changed
 - **Reordered Phases**:
