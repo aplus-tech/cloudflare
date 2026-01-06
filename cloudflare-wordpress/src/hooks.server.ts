@@ -2,7 +2,15 @@ import type { Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
-    const cacheKey = `html:${url.pathname}${url.search}`;
+
+    // 【優化】過濾掉常見的追蹤參數，確保 Cache Key 唯一性
+    const searchParams = new URLSearchParams(url.search);
+    const trackingParams = ['fbclid', 'gclid', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    trackingParams.forEach(param => searchParams.delete(param));
+
+    const cleanSearch = searchParams.toString();
+    const cacheKey = `html:${url.pathname}${cleanSearch ? '?' + cleanSearch : ''}`;
+
     const ORIGIN = 'https://aplus-tech.com.hk';
     const ORIGIN_HOST = new URL(ORIGIN).host;
     const currentHost = url.host;
@@ -12,13 +20,13 @@ export const handle: Handle = async ({ event, resolve }) => {
         return resolve(event);
     }
 
-    // 2. 檢查是否有登入 Cookie (繞過緩存)
+    // 2. 檢查是否有登入 Cookie
     const cookies = event.request.headers.get('cookie') || '';
     if (cookies.includes('wordpress_logged_in_') || cookies.includes('wp-settings-')) {
         return resolve(event);
     }
 
-    // 3. 嘗試從 KV 讀取緩存
+    // 3. 嘗試從 KV 讀取 HTML 緩存
     try {
         // @ts-ignore
         const cachedHTML = await event.platform?.env.HTML_CACHE.get(cacheKey);
@@ -28,6 +36,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                 headers: {
                     'Content-Type': 'text/html; charset=UTF-8',
                     'X-Edge-Cache': 'Hit',
+                    'Cache-Control': 'public, max-age=3600',
                     ...(currentHost.includes('pages.dev') ? { 'X-Robots-Tag': 'noindex, nofollow' } : {})
                 }
             });
@@ -36,39 +45,34 @@ export const handle: Handle = async ({ event, resolve }) => {
         console.error('KV Cache Read Error:', e);
     }
 
-    // 4. Cache Miss: 執行 SvelteKit 路由
+    // 4. Cache Miss: 執行 Proxy
     let response = await resolve(event);
 
-    // 如果 SvelteKit 404，執行 Proxy
     if (response.status === 404) {
-        console.log(`[Proxying to WordPress] ${url.pathname}`);
-
-        // 抓取原站內容
         const originResponse = await fetch(`${ORIGIN}${url.pathname}${url.search}`, {
             headers: event.request.headers
         });
 
-        // 處理 HTML 內容替換
-        if (originResponse.headers.get('content-type')?.includes('text/html')) {
+        const contentType = originResponse.headers.get('content-type') || '';
+
+        if (contentType.includes('text/html')) {
             let body = await originResponse.text();
 
-            // 激進替換：處理有 www 同冇 www 嘅情況
             const hostsToReplace = [ORIGIN_HOST, `www.${ORIGIN_HOST}`];
             hostsToReplace.forEach(h => {
                 body = body.split(h).join(currentHost);
             });
 
-            // 修正 Canonical
             if (currentHost.includes('pages.dev')) {
                 const canonicalPattern = new RegExp(`<link rel=["']canonical["'] href=["']https://${currentHost}(.*?)["']`, 'g');
                 body = body.replace(canonicalPattern, `<link rel="canonical" href="${ORIGIN}$1"`);
             }
 
-            // 建立新 Response，刪除可能導致衝突的 Header (如 Content-Encoding)
             const newHeaders = new Headers(originResponse.headers);
             newHeaders.delete('content-encoding');
             newHeaders.delete('content-length');
             newHeaders.set('Content-Type', 'text/html; charset=UTF-8');
+            newHeaders.set('Cache-Control', 'public, max-age=3600');
             if (currentHost.includes('pages.dev')) {
                 newHeaders.set('X-Robots-Tag', 'noindex, nofollow');
             }
@@ -78,19 +82,22 @@ export const handle: Handle = async ({ event, resolve }) => {
                 headers: newHeaders
             });
         } else {
-            // 非 HTML 內容 (如圖片、JS) 直接回傳
-            response = originResponse;
+            const assetHeaders = new Headers(originResponse.headers);
+            assetHeaders.set('Cache-Control', 'public, max-age=2592000, immutable');
+            response = new Response(originResponse.body, {
+                status: originResponse.status,
+                headers: assetHeaders
+            });
         }
     }
 
-    // 5. 存入 KV
+    // 5. 存入 KV (僅限 HTML)
     if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
         const responseClone = response.clone();
         const html = await responseClone.text();
         try {
             // @ts-ignore
             await event.platform?.env.HTML_CACHE.put(cacheKey, html, { expirationTtl: 604800 });
-            console.log(`[Cache Saved] ${url.pathname}`);
         } catch (e) {
             console.error('KV Cache Write Error:', e);
         }
