@@ -3,8 +3,9 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
     const cacheKey = `html:${url.pathname}${url.search}`;
-    const ORIGIN = 'https://aplus-tech.com.hk'; // 你的 WordPress 原站
+    const ORIGIN = 'https://aplus-tech.com.hk';
     const ORIGIN_HOST = new URL(ORIGIN).host;
+    const currentHost = url.host;
 
     // 1. 排除非 GET 請求或特定路徑
     if (event.request.method !== 'GET' || url.pathname.startsWith('/api') || url.pathname.startsWith('/admin')) {
@@ -27,8 +28,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                 headers: {
                     'Content-Type': 'text/html; charset=UTF-8',
                     'X-Edge-Cache': 'Hit',
-                    // 如果是測試域名，加入 noindex 保護 SEO
-                    ...(url.host.includes('pages.dev') ? { 'X-Robots-Tag': 'noindex, nofollow' } : {})
+                    ...(currentHost.includes('pages.dev') ? { 'X-Robots-Tag': 'noindex, nofollow' } : {})
                 }
             });
         }
@@ -36,44 +36,57 @@ export const handle: Handle = async ({ event, resolve }) => {
         console.error('KV Cache Read Error:', e);
     }
 
-    // 4. Cache Miss: 如果 SvelteKit 沒有定義這個路由，就去 WordPress 抓
+    // 4. Cache Miss: 執行 SvelteKit 路由
     let response = await resolve(event);
 
+    // 如果 SvelteKit 404，執行 Proxy
     if (response.status === 404) {
         console.log(`[Proxying to WordPress] ${url.pathname}`);
+
+        // 抓取原站內容
         const originResponse = await fetch(`${ORIGIN}${url.pathname}${url.search}`, {
             headers: event.request.headers
         });
 
-        let body = await originResponse.text();
-        const currentHost = url.host;
+        // 處理 HTML 內容替換
+        if (originResponse.headers.get('content-type')?.includes('text/html')) {
+            let body = await originResponse.text();
 
-        // 替換所有連結，讓用戶留在 Cloudflare 網域
-        body = body.split(ORIGIN_HOST).join(currentHost);
-        body = body.split('https://' + ORIGIN_HOST).join('https://' + currentHost);
+            // 激進替換：處理有 www 同冇 www 嘅情況
+            const hostsToReplace = [ORIGIN_HOST, `www.${ORIGIN_HOST}`];
+            hostsToReplace.forEach(h => {
+                body = body.split(h).join(currentHost);
+            });
 
-        // 【SEO 保護】如果是在測試網域，確保 Canonical Tag 依然指向原站
-        if (currentHost.includes('pages.dev')) {
-            const canonicalPattern = new RegExp(`<link rel=["']canonical["'] href=["']https://${currentHost}(.*?)["']`, 'g');
-            body = body.replace(canonicalPattern, `<link rel="canonical" href="${ORIGIN}$1"`);
-        }
-
-        response = new Response(body, {
-            status: originResponse.status,
-            headers: {
-                ...Object.fromEntries(originResponse.headers.entries()),
-                'Content-Type': 'text/html; charset=UTF-8',
-                // 如果是測試域名，加入 noindex
-                ...(currentHost.includes('pages.dev') ? { 'X-Robots-Tag': 'noindex, nofollow' } : {})
+            // 修正 Canonical
+            if (currentHost.includes('pages.dev')) {
+                const canonicalPattern = new RegExp(`<link rel=["']canonical["'] href=["']https://${currentHost}(.*?)["']`, 'g');
+                body = body.replace(canonicalPattern, `<link rel="canonical" href="${ORIGIN}$1"`);
             }
-        });
+
+            // 建立新 Response，刪除可能導致衝突的 Header (如 Content-Encoding)
+            const newHeaders = new Headers(originResponse.headers);
+            newHeaders.delete('content-encoding');
+            newHeaders.delete('content-length');
+            newHeaders.set('Content-Type', 'text/html; charset=UTF-8');
+            if (currentHost.includes('pages.dev')) {
+                newHeaders.set('X-Robots-Tag', 'noindex, nofollow');
+            }
+
+            response = new Response(body, {
+                status: originResponse.status,
+                headers: newHeaders
+            });
+        } else {
+            // 非 HTML 內容 (如圖片、JS) 直接回傳
+            response = originResponse;
+        }
     }
 
-    // 5. 如果是成功的 HTML 回應，存入 KV
+    // 5. 存入 KV
     if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
         const responseClone = response.clone();
         const html = await responseClone.text();
-
         try {
             // @ts-ignore
             await event.platform?.env.HTML_CACHE.put(cacheKey, html, { expirationTtl: 604800 });
