@@ -1,0 +1,26 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+- **Phase 0: Cleanup**: Added a step to delete unauthorized files (`edge-cache-worker`, `wp-purge-plugin.php`) before proceeding.
+- **Phase 2: Foundation Setup**: Restored the SvelteKit initialization step which was accidentally removed.
+- **Phase 3: Edge Cache**: Prioritized Edge Cache implementation immediately after Foundation Setup.
+- **Architecture Update**: Expanded D1 Schema to 10 tables. Added `sync_terms` for full taxonomy support (Brands, Attributes, Tags, Cats). Updated `sync_products` and `sync_posts` to include JSON fields for attributes and term relationships.
+- **Database Config**: Updated D1 database name to `wordpress-cloudflare` and ID to `a061682a-515f-4fde-9b80-273632eb0e04`.
+- **Phase 3: Edge Cache**: Implemented KV-based HTML caching in `hooks.server.ts` and created a WordPress purge plugin (`wp-cache-purge.php`).
+
+### Changed
+- **Reordered Phases**:
+    - Old Phase 2 (Edge Cache) -> New Phase 3.
+    - Old Phase 2 (Foundation) -> New Phase 2.
+    - Old Phase 3 (Sync) -> New Phase 4.
+    - Old Phase 4 (Quote) -> New Phase 5.
+    - Old Phase 5 (AI) -> New Phase 6.
+- **Updated `task.md`**: Reflected the new phase order and added the Cleanup task.
+- **Updated `implementation_plan.md`**: Detailed the new execution order.
+
+### Removed
+- Removed the immediate "Edge Cache" task from Phase 2 in `task.md` to ensure Foundation Setup is done first.

@@ -1,0 +1,27 @@
+# Task List: WordPress + Cloudflare Hybrid Architecture
+
+- [x] **Phase 0: Cleanup (Immediate Action)** <!-- id: 99 -->
+    - [x] Delete unauthorized `edge-cache-worker` directory <!-- id: 100 -->
+    - [x] Delete unauthorized `wp-purge-plugin.php` <!-- id: 101 -->
+- [x] **Phase 1: System Design & Documentation** <!-- id: 0 -->
+    - [x] Create `architecture_design.md` (Detailed system record, schemas, workflows) <!-- id: 1 -->
+    - [x] Create `implementation_plan.md` (Execution roadmap) <!-- id: 2 -->
+    - [x] Expand D1 Schema (Full Taxonomy: Terms, Brands, Attributes) <!-- id: 1a -->
+- [x] **Phase 2: Foundation Setup** <!-- id: 3 -->
+    - [x] Initialize Cloudflare Workers/Pages project (SvelteKit) <!-- id: 4 -->
+    - [x] Setup D1 Database (`wordpress-cloudflare`) & Schemas <!-- id: 5 -->
+    - [ ] Setup R2 Bucket & Access <!-- id: 6 -->
+- [ ] **Phase 3: 極速邊緣緩存 (Edge Cache / KV)** <!-- id: 14a -->
+    - [x] Setup KV Namespaces (`HTML_CACHE`) <!-- id: 7 -->
+    - [x] Implement KV Edge Cache Logic (HTML caching) <!-- id: 14 -->
+    - [/] Develop WP Webhook for Cache Purge <!-- id: 9 -->
+- [x] **Phase 4: 數據同步管道 (The Sync Pipeline)** <!-- id: 8 -->
+    - [x] Implement D1 Sync Worker (Receiver) <!-- id: 13 -->
+    - [x] Develop WP Webhook for D1 Sync <!-- id: 9b -->
+- [/] **Phase 5: Quote & Invoice System (SvelteKit)** <!-- id: 17 -->
+    - [ ] Build User Management UI <!-- id: 18 -->
+    - [ ] Build Quote Editor <!-- id: 19 -->
+    - [ ] Implement PDF Generation & R2 Upload <!-- id: 20 -->
+- [ ] **Phase 6: AI & Crawler** <!-- id: 12 -->
+    - [ ] Implement Crawler Worker <!-- id: 15 -->
+    - [ ] Implement AI Worker <!-- id: 16 -->
