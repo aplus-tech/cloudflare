@@ -8,17 +8,21 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
     const db = platform.env.DB;
     const r2 = platform.env.MEDIA_BUCKET;
 
-    // 檢查 Binding 是否存在
     if (!db) throw new Error('D1 Database (DB) binding is missing');
     if (!r2) throw new Error('R2 Bucket (MEDIA_BUCKET) binding is missing');
 
     try {
+        // 【關鍵修復】處理中文網址編碼
+        // 如果網址有中文，fetch 會報 400。我哋用 new URL().href 嚟自動做百分比編碼。
+        const encodedUrl = new URL(url).href;
+
         // 1. 檢查是否已經同步過
         const existing = await db.prepare('SELECT r2_path FROM media_mapping WHERE original_url = ?').bind(url).first();
         if (existing) return existing.r2_path;
 
-        // 2. 解析檔名
-        const filename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
+        // 2. 解析檔名 (解碼後再用，等 R2 入面睇到中文名)
+        const rawFilename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
+        const filename = decodeURIComponent(rawFilename);
 
         // 3. 決定 R2 路徑
         let r2Path = '';
@@ -35,11 +39,15 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
             r2Path = `assets/common/${filename}`;
         }
 
-        // 4. 從 WordPress 下載圖片
-        const response = await fetch(url, {
+        // 4. 從 WordPress 下載圖片 (使用編碼後嘅網址)
+        const response = await fetch(encodedUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
         });
-        if (!response.ok) throw new Error(`Failed to fetch image from WP: ${url} (Status: ${response.status})`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch image from WP: ${encodedUrl} (Status: ${response.status})`);
+        }
+
         const blob = await response.blob();
 
         // 5. 上傳到 R2
@@ -56,7 +64,7 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
         return r2Path;
     } catch (e: any) {
         console.error(`Image Sync Error (${url}):`, e.message);
-        throw e; // 拋出錯誤，讓外層知道失敗
+        throw e;
     }
 }
 
@@ -98,7 +106,6 @@ async function performSync(data: any, platform: any) {
             Math.floor(Date.now() / 1000)
         ).run();
     }
-    // ... 其他類型 (post, page) 暫略，先測試產品
 }
 
 export const POST: RequestHandler = async ({ request, platform }) => {
@@ -110,7 +117,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 暫時改為「同步執行」，唔用 waitUntil，方便 Debug
         await performSync(data, platform);
 
         return json({ success: true, message: 'Sync completed successfully' });
