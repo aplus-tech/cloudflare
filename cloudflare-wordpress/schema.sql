@@ -138,3 +138,15 @@ CREATE TABLE raw_scrapes (
     parsed_data TEXT,                -- JSON
     scraped_at INTEGER
 );
+-- 11. 媒體映射表 (Media Mapping)
+CREATE TABLE media_mapping (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    original_url TEXT UNIQUE,        -- WordPress 原始圖片網址
+    r2_path TEXT,                    -- R2 中的儲存路徑
+    media_type TEXT,                 -- product, post, page, etc.
+    brand TEXT,                      -- 關聯品牌
+    object_id INTEGER,               -- WordPress 媒體 ID
+    alt_text TEXT,                   -- 替代文字
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_media_original ON media_mapping(original_url);
