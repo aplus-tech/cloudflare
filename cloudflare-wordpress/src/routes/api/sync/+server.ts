@@ -8,23 +8,17 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
     const db = platform.env.DB;
     const r2 = platform.env.MEDIA_BUCKET;
 
-    if (!db) throw new Error('D1 Database (DB) binding is missing');
-    if (!r2) throw new Error('R2 Bucket (MEDIA_BUCKET) binding is missing');
+    if (!db || !r2) return url;
 
     try {
-        // 【關鍵修復】處理中文網址編碼
-        // 如果網址有中文，fetch 會報 400。我哋用 new URL().href 嚟自動做百分比編碼。
         const encodedUrl = new URL(url).href;
 
-        // 1. 檢查是否已經同步過
         const existing = await db.prepare('SELECT r2_path FROM media_mapping WHERE original_url = ?').bind(url).first();
         if (existing) return existing.r2_path;
 
-        // 2. 解析檔名 (解碼後再用，等 R2 入面睇到中文名)
         const rawFilename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
         const filename = decodeURIComponent(rawFilename);
 
-        // 3. 決定 R2 路徑
         let r2Path = '';
         const cleanBrand = brand ? brand.toLowerCase().replace(/\s+/g, '-') : 'unknown';
         const cleanSlug = slug ? slug.toLowerCase().replace(/\s+/g, '-') : 'unknown';
@@ -39,23 +33,17 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
             r2Path = `assets/common/${filename}`;
         }
 
-        // 4. 從 WordPress 下載圖片 (使用編碼後嘅網址)
         const response = await fetch(encodedUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch image from WP: ${encodedUrl} (Status: ${response.status})`);
-        }
-
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
         const blob = await response.blob();
 
-        // 5. 上傳到 R2
         await r2.put(r2Path, blob, {
             httpMetadata: { contentType: response.headers.get('content-type') || 'image/jpeg' }
         });
 
-        // 6. 記錄到 D1
         await db.prepare(`
             INSERT OR IGNORE INTO media_mapping (original_url, r2_path, media_type, brand, object_id, alt_text)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -63,8 +51,8 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
 
         return r2Path;
     } catch (e: any) {
-        console.error(`Image Sync Error (${url}):`, e.message);
-        throw e;
+        console.error(`Image Sync Error:`, e.message);
+        return url;
     }
 }
 
@@ -73,35 +61,45 @@ async function performSync(data: any, platform: any) {
     const db = platform.env.DB;
 
     if (type === 'product') {
-        let { id, sku, title, content, price, stock_status, categories, tags, brand, attributes, term_ids, image_url, gallery_images, seo_title, seo_description, seo_keywords } = payload;
+        // 確保所有欄位都有預設值，避免 undefined
+        const id = payload.id;
+        const sku = payload.sku ?? null;
+        const title = payload.title ?? null;
+        const content = payload.content ?? null;
+        const price = payload.price ?? 0;
+        const stock_status = payload.stock_status ?? null;
+        const categories = Array.isArray(payload.categories) ? payload.categories.join(', ') : null;
+        const tags = Array.isArray(payload.tags) ? payload.tags.join(', ') : null;
+        const brand = payload.brand ?? null;
+        const seo_title = payload.seo_title ?? null;
+        const seo_description = payload.seo_description ?? null;
+        const seo_keywords = payload.seo_keywords ?? null;
 
-        // 處理主圖
+        // 【關鍵修復】確保 JSON.stringify 唔會收到 undefined
+        const attributes = JSON.stringify(payload.attributes || {});
+        const term_ids = JSON.stringify(payload.term_ids || []);
+        const gallery_images_raw = payload.gallery_images || [];
+
+        let image_url = payload.image_url ?? null;
         if (image_url) {
-            image_url = await syncImageToR2(image_url, 'product', brand, title, platform);
+            image_url = await syncImageToR2(image_url, 'product', brand || 'unknown', title || 'unknown', platform);
         }
 
-        // 處理相簿
-        if (Array.isArray(gallery_images)) {
-            const syncedGallery = [];
-            for (const img of gallery_images) {
-                syncedGallery.push(await syncImageToR2(img, 'product', brand, title, platform));
+        let gallery_images = [];
+        if (Array.isArray(gallery_images_raw)) {
+            for (const img of gallery_images_raw) {
+                gallery_images.push(await syncImageToR2(img, 'product', brand || 'unknown', title || 'unknown', platform));
             }
-            gallery_images = syncedGallery;
         }
+        const gallery_json = JSON.stringify(gallery_images);
 
         await db.prepare(`
             INSERT OR REPLACE INTO sync_products (
                 id, sku, title, content, price, stock_status, categories, tags, brand, attributes, term_ids, image_url, gallery_images, seo_title, seo_description, seo_keywords, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-            id, sku, title, content, price, stock_status,
-            Array.isArray(categories) ? categories.join(', ') : categories,
-            Array.isArray(tags) ? tags.join(', ') : tags,
-            brand,
-            JSON.stringify(attributes),
-            JSON.stringify(term_ids),
-            image_url,
-            JSON.stringify(gallery_images),
+            id, sku, title, content, price, stock_status, categories, tags, brand,
+            attributes, term_ids, image_url, gallery_json,
             seo_title, seo_description, seo_keywords,
             Math.floor(Date.now() / 1000)
         ).run();
@@ -117,8 +115,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        await performSync(data, platform);
+        if (!platform?.env.DB) return json({ error: 'DB missing' }, { status: 500 });
 
+        await performSync(data, platform);
         return json({ success: true, message: 'Sync completed successfully' });
     } catch (e: any) {
         console.error('Sync Error:', e.message);
