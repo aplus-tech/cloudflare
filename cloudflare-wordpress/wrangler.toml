@@ -10,6 +10,10 @@ database_id = "a061682a-515f-4fde-9b80-273632eb0e04"
 binding = "HTML_CACHE"
 id = "695adac89df4448e81b9ffc05f639491"
 
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "media-bucket"
+
 [vars]
 PURGE_SECRET = "REPLACE_WITH_A_SECURE_KEY"
 SYNC_SECRET_KEY = "Lui@63006021"

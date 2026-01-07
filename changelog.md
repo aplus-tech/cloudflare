@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 - **Database Config**: Updated D1 database name to `wordpress-cloudflare` and ID to `a061682a-515f-4fde-9b80-273632eb0e04`.
 - **Phase 3: Edge Cache**: Implemented KV-based HTML caching in `hooks.server.ts` and created a WordPress purge plugin (`wp-cache-purge.php`).
 - **Deployment**: Successfully connected GitHub repo and deployed to Cloudflare Pages.
+- **Phase 4: Sync Pipeline**: Completed real-time data synchronization from WordPress to D1 for products, posts, pages, and terms.
+- **Phase 4.5 (Planned)**: Defined Semantic Media Migration strategy using R2 and D1 mapping for brand-based image organization.
 
 ### Changed
 - **Reordered Phases**:

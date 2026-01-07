@@ -10,39 +10,25 @@
 - [x] **Phase 2: Foundation Setup** <!-- id: 3 -->
     - [x] Initialize Cloudflare Workers/Pages project (SvelteKit) <!-- id: 4 -->
     - [x] Setup D1 Database (`wordpress-cloudflare`) & Schemas <!-- id: 5 -->
+    - [x] Successful Deployment to Cloudflare Pages <!-- id: 21 -->
     - [ ] Setup R2 Bucket & Access <!-- id: 6 -->
-- [ ] **Phase 3: 極速邊緣緩存 (Edge Cache / KV)** <!-- id: 14a -->
+- [x] **Phase 3: 極速邊緣緩存 (Edge Cache / KV)** <!-- id: 14a -->
     - [x] Setup KV Namespaces (`HTML_CACHE`) <!-- id: 7 -->
     - [x] Implement KV Edge Cache Logic (HTML caching) <!-- id: 14 -->
-# Task List: WordPress + Cloudflare Hybrid Architecture
-
-- [x] **Phase 0: Cleanup (Immediate Action)** <!-- id: 99 -->
-    - [x] Delete unauthorized `edge-cache-worker` directory <!-- id: 100 -->
-    - [x] Delete unauthorized `wp-purge-plugin.php` <!-- id: 101 -->
-- [x] **Phase 1: System Design & Documentation** <!-- id: 0 -->
-    - [x] Create `architecture_design.md` (Detailed system record, schemas, workflows) <!-- id: 1 -->
-    - [x] Create `implementation_plan.md` (Execution roadmap) <!-- id: 2 -->
-    - [x] Expand D1 Schema (Full Taxonomy: Terms, Brands, Attributes) <!-- id: 1a -->
-- [x] **Phase 2: Foundation Setup** <!-- id: 3 -->
-    - [x] Initialize Cloudflare Workers/Pages project (SvelteKit) <!-- id: 4 -->
-    - [x] Setup D1 Database (`wordpress-cloudflare`) & Schemas <!-- id: 5 -->
-    - [ ] Setup R2 Bucket & Access <!-- id: 6 -->
-- [ ] **Phase 3: 極速邊緣緩存 (Edge Cache / KV)** <!-- id: 14a -->
-    - [x] Setup KV Namespaces (`HTML_CACHE`) <!-- id: 7 -->
-    - [x] Implement KV Edge Cache Logic (HTML caching) <!-- id: 14 -->
-    - [/] Develop WP Webhook for Cache Purge <!-- id: 9 -->
+    - [x] Develop WP Webhook for Cache Purge <!-- id: 9 -->
 - [x] **Phase 4: 數據同步管道 (The Sync Pipeline)** <!-- id: 8 -->
     - [x] Implement D1 Sync Worker (Receiver) <!-- id: 13 -->
     - [x] Develop WP Webhook for D1 Sync <!-- id: 9b -->
+    - [x] Verify Real-time Data Sync (WordPress -> D1) <!-- id: 22 -->
+- [ ] **Phase 4.5: R2 語義化媒體遷移 (Semantic Media Migration)** <!-- id: 23 -->
+    - [ ] Configure R2 Bucket & Media Domain (`media.aplus-tech.com.hk`) <!-- id: 24 -->
+    - [ ] Create D1 `media_mapping` table <!-- id: 25 -->
+    - [ ] Implement Semantic Path Logic (Brand/Slug based) <!-- id: 26 -->
+    - [ ] Develop Auto-migration Worker (WP -> R2 with Mapping) <!-- id: 27 -->
 - [/] **Phase 5: Quote & Invoice System (SvelteKit)** <!-- id: 17 -->
     - [ ] Build User Management UI <!-- id: 18 -->
     - [ ] Build Quote Editor <!-- id: 19 -->
     - [ ] Implement PDF Generation & R2 Upload <!-- id: 20 -->
-- [x] **Phase 2: 基礎設施搭建 (Foundation)** <!-- id: 5 -->
-    - [x] Manual SvelteKit Setup (UNC Bypass) <!-- id: 10 -->
-    - [x] D1 Database & Schema Setup <!-- id: 11 -->
-    - [x] KV Namespace Setup <!-- id: 12 -->
-    - [x] Successful Deployment to Cloudflare Pages <!-- id: 21 -->
 - [ ] **Phase 6: AI & Crawler** <!-- id: 12 -->
     - [ ] Implement Crawler Worker <!-- id: 15 -->
     - [ ] Implement AI Worker <!-- id: 16 -->

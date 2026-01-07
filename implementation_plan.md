@@ -1,6 +1,6 @@
 # Implementation Plan: WordPress + Cloudflare Automation
 
-這份計畫書將執行過程分為五個階段，每個階段都有明確的目標和驗證步驟。
+這份計畫書將執行過程分為五個階段，每個階段都有明確的目標 and 驗證步驟。
 
 ## Phase 0: 清理與重置 (Cleanup)
 **目標**: 刪除未經授權的檔案，確保環境乾淨。
@@ -47,7 +47,7 @@
     *   編寫 PHP Snippet (WP Plugin) (已完成)。
     *   當 `save_post` 時，同時發送請求給 Worker 清除對應 URL 的 KV (已完成)。
 
-## Phase 4: 數據同步管道 (The Sync Pipeline)
+## Phase 4: 數據同步管道 (The Sync Pipeline) - 已完成
 **目標**: 讓 WordPress 的數據自動流向 Cloudflare D1。
 
 1.  **WordPress 端 (Sender)**:
@@ -61,6 +61,20 @@
 3.  **配置 D1 數據庫**:
     *   建立 D1: `npx wrangler d1 create wordpress-cloudflare` (已完成)。
     *   應用 Schema (已完成)。
+
+## Phase 4.5: R2 語義化媒體遷移 (Semantic Media Migration)
+**目標**: 將 WordPress 圖片遷移至 R2，並重組為按品牌與類型分類的專業目錄結構。
+
+### 1. 語義化目錄架構 (Semantic Structure):
+*   **產品**: `products/[brand]/[product-slug].jpg`
+*   **文章**: `posts/[post-slug]/[image-name].jpg`
+*   **頁面**: `pages/[page-slug]/[image-name].jpg`
+*   **公共資源**: `assets/common/[filename].png`
+
+### 2. 技術實作:
+*   **D1 Mapping**: 建立 `media_mapping` 表，記錄 `original_url` 與 `r2_path` 的對應關係。
+*   **自動替換**: 修改 SvelteKit Proxy，在回傳 HTML 前根據 D1 Mapping 自動將 WP 圖片網址替換為 R2 媒體域名網址。
+*   **Lazy Migration**: 當圖片被訪問且 R2 未命中時，自動從 WP 抓取、重命名並存入 R2。
 
 ## Phase 5: 報價與發票系統開發 (SvelteKit App)
 **目標**: 建立一個極速的後台供內部使用。

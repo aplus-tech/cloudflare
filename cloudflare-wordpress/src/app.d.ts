@@ -10,6 +10,7 @@ declare global {
             env: {
                 DB: D1Database;
                 HTML_CACHE: KVNamespace;
+                MEDIA_BUCKET: R2Bucket;
             };
             context: ExecutionContext;
             caches: CacheStorage & { default: Cache };
