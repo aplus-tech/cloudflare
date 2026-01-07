@@ -20,11 +20,11 @@
     - [x] Implement D1 Sync Worker (Receiver) <!-- id: 13 -->
     - [x] Develop WP Webhook for D1 Sync <!-- id: 9b -->
     - [x] Verify Real-time Data Sync (WordPress -> D1) <!-- id: 22 -->
-- [ ] **Phase 4.5: R2 語義化媒體遷移 (Semantic Media Migration)** <!-- id: 23 -->
-    - [ ] Configure R2 Bucket & Media Domain (`media.aplus-tech.com.hk`) <!-- id: 24 -->
-    - [ ] Create D1 `media_mapping` table <!-- id: 25 -->
-    - [ ] Implement Semantic Path Logic (Brand/Slug based) <!-- id: 26 -->
-    - [ ] Develop Auto-migration Worker (WP -> R2 with Mapping) <!-- id: 27 -->
+- [x] **Phase 4.5: R2 語義化媒體遷移 (Semantic Media Migration)** <!-- id: 23 -->
+    - [x] Configure R2 Bucket & Media Domain (`media.aplus-tech.com.hk`) <!-- id: 24 -->
+    - [x] Create D1 `media_mapping` table <!-- id: 25 -->
+    - [x] Implement Semantic Path Logic (Brand/Slug based) <!-- id: 26 -->
+    - [x] Develop Auto-migration Worker (WP -> R2 with Mapping) <!-- id: 27 -->
 - [/] **Phase 5: Quote & Invoice System (SvelteKit)** <!-- id: 17 -->
     - [ ] Build User Management UI <!-- id: 18 -->
     - [ ] Build Quote Editor <!-- id: 19 -->

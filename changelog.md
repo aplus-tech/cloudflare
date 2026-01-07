@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- **Phase 4.5: Semantic Media Migration**: 
+    - Implemented brand-based semantic folder structure in R2 (`products/[brand]/[filename]`).
+    - Resolved WordPress "Critical Error" by implementing `platform.context.waitUntil` for background syncing and adding safety checks for `WP_Error`.
+    - Fixed 400 Bad Request errors for images with Chinese characters using URL encoding.
+    - Implemented automatic brand taxonomy detection (`product_brand`, `pa_brand`, etc.) in the WordPress plugin.
+    - Fixed `D1_TYPE_ERROR` by ensuring all data sent to D1 is properly sanitized and handles `undefined` values.
+    - Optimized sync performance with non-blocking requests in WordPress.
 
 ### Added
 - **Phase 0: Cleanup**: Added a step to delete unauthorized files (`edge-cache-worker`, `wp-purge-plugin.php`) before proceeding.

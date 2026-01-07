@@ -62,7 +62,7 @@
     *   建立 D1: `npx wrangler d1 create wordpress-cloudflare` (已完成)。
     *   應用 Schema (已完成)。
 
-## Phase 4.5: R2 語義化媒體遷移 (Semantic Media Migration)
+## Phase 4.5: R2 語義化媒體遷移 (Semantic Media Migration) - 已完成
 **目標**: 將 WordPress 圖片遷移至 R2，並重組為按品牌與類型分類的專業目錄結構。
 
 ### 1. 語義化目錄架構 (Semantic Structure):

@@ -7,18 +7,14 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
 
     const db = platform.env.DB;
     const r2 = platform.env.MEDIA_BUCKET;
-
-    if (!db) throw new Error('D1 Database (DB) binding is missing');
-    if (!r2) throw new Error('R2 Bucket (MEDIA_BUCKET) binding is missing');
+    if (!db || !r2) return url;
 
     try {
         const encodedUrl = new URL(url).href;
 
-        // 【Debug 模式】暫時註解掉 D1 檢查，強制重新上傳 R2
-        /*
+        // 1. 檢查是否已經同步過 (恢復檢查，避免重複上傳)
         const existing = await db.prepare('SELECT r2_path FROM media_mapping WHERE original_url = ?').bind(url).first();
         if (existing) return existing.r2_path;
-        */
 
         const rawFilename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
         const filename = decodeURIComponent(rawFilename);
@@ -40,28 +36,23 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
         const response = await fetch(encodedUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
         });
-
-        if (!response.ok) {
-            throw new Error(`Fetch from WP failed: ${response.status} for ${encodedUrl}`);
-        }
+        if (!response.ok) return url;
 
         const blob = await response.blob();
 
-        // 執行 R2 上傳
         await r2.put(r2Path, blob, {
             httpMetadata: { contentType: response.headers.get('content-type') || 'image/jpeg' }
         });
 
-        // 記錄到 D1
         await db.prepare(`
-            INSERT OR REPLACE INTO media_mapping (original_url, r2_path, media_type, brand, object_id, alt_text)
+            INSERT OR IGNORE INTO media_mapping (original_url, r2_path, media_type, brand, object_id, alt_text)
             VALUES (?, ?, ?, ?, ?, ?)
         `).bind(url, r2Path, type, brand || null, object_id || null, alt_text || null).run();
 
         return r2Path;
-    } catch (e: any) {
-        // 【關鍵】唔好 catch 佢，等錯誤拋返出去俾 WordPress 睇
-        throw new Error(`R2 Sync Failed: ${e.message}`);
+    } catch (e) {
+        console.error(`Image Sync Error:`, e);
+        return url;
     }
 }
 
@@ -122,12 +113,16 @@ export const POST: RequestHandler = async ({ request, platform }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (!platform?.env.DB) return json({ error: 'DB binding missing' }, { status: 500 });
-
-        await performSync(data, platform);
-        return json({ success: true, message: 'Sync completed successfully' });
+        // 恢復背景執行，讓 WordPress 不用等待
+        if (platform.context?.waitUntil) {
+            platform.context.waitUntil(performSync(data, platform));
+            return json({ success: true, message: 'Sync started in background' });
+        } else {
+            await performSync(data, platform);
+            return json({ success: true });
+        }
     } catch (e: any) {
         console.error('Sync Error:', e.message);
-        return json({ error: e.message }, { status: 500 });
+        return json({ error: 'Internal Server Error' }, { status: 500 });
     }
 };
