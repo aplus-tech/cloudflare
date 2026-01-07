@@ -8,13 +8,17 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
     const db = platform.env.DB;
     const r2 = platform.env.MEDIA_BUCKET;
 
-    if (!db || !r2) return url;
+    if (!db) throw new Error('D1 Database (DB) binding is missing');
+    if (!r2) throw new Error('R2 Bucket (MEDIA_BUCKET) binding is missing');
 
     try {
         const encodedUrl = new URL(url).href;
 
+        // 【Debug 模式】暫時註解掉 D1 檢查，強制重新上傳 R2
+        /*
         const existing = await db.prepare('SELECT r2_path FROM media_mapping WHERE original_url = ?').bind(url).first();
         if (existing) return existing.r2_path;
+        */
 
         const rawFilename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
         const filename = decodeURIComponent(rawFilename);
@@ -37,22 +41,27 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
         });
 
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`Fetch from WP failed: ${response.status} for ${encodedUrl}`);
+        }
+
         const blob = await response.blob();
 
+        // 執行 R2 上傳
         await r2.put(r2Path, blob, {
             httpMetadata: { contentType: response.headers.get('content-type') || 'image/jpeg' }
         });
 
+        // 記錄到 D1
         await db.prepare(`
-            INSERT OR IGNORE INTO media_mapping (original_url, r2_path, media_type, brand, object_id, alt_text)
+            INSERT OR REPLACE INTO media_mapping (original_url, r2_path, media_type, brand, object_id, alt_text)
             VALUES (?, ?, ?, ?, ?, ?)
         `).bind(url, r2Path, type, brand || null, object_id || null, alt_text || null).run();
 
         return r2Path;
     } catch (e: any) {
-        console.error(`Image Sync Error:`, e.message);
-        return url;
+        // 【關鍵】唔好 catch 佢，等錯誤拋返出去俾 WordPress 睇
+        throw new Error(`R2 Sync Failed: ${e.message}`);
     }
 }
 
@@ -61,7 +70,6 @@ async function performSync(data: any, platform: any) {
     const db = platform.env.DB;
 
     if (type === 'product') {
-        // 確保所有欄位都有預設值，避免 undefined
         const id = payload.id;
         const sku = payload.sku ?? null;
         const title = payload.title ?? null;
@@ -75,7 +83,6 @@ async function performSync(data: any, platform: any) {
         const seo_description = payload.seo_description ?? null;
         const seo_keywords = payload.seo_keywords ?? null;
 
-        // 【關鍵修復】確保 JSON.stringify 唔會收到 undefined
         const attributes = JSON.stringify(payload.attributes || {});
         const term_ids = JSON.stringify(payload.term_ids || []);
         const gallery_images_raw = payload.gallery_images || [];
@@ -115,7 +122,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (!platform?.env.DB) return json({ error: 'DB missing' }, { status: 500 });
+        if (!platform?.env.DB) return json({ error: 'DB binding missing' }, { status: 500 });
 
         await performSync(data, platform);
         return json({ success: true, message: 'Sync completed successfully' });
