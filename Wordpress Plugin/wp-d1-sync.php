@@ -9,8 +9,8 @@ if (!defined('ABSPATH'))
 
 class APlus_D1_Sync
 {
-    private $sync_url = 'https://your-sveltekit-app.pages.dev/api/sync';
-    private $secret_key = 'YOUR_SYNC_SECRET';
+    private $sync_url = 'https://cloudflare-9qe.pages.dev/api/sync';
+    private $secret_key = 'Lui@63006021';
 
     public function __construct()
     {
@@ -23,11 +23,25 @@ class APlus_D1_Sync
         add_action('edited_term', array($this, 'sync_term'), 10, 3);
     }
 
+    /**
+     * 防死機保護：安全獲取 Term 名稱
+     */
+    private function get_safe_term_names($post_id, $taxonomy)
+    {
+        $terms = wp_get_post_terms($post_id, $taxonomy, array('fields' => 'names'));
+        if (is_wp_error($terms) || empty($terms)) {
+            return array();
+        }
+        return $terms;
+    }
+
     public function sync_product($post_id, $post, $update)
     {
         if ($post->post_status !== 'publish')
             return;
 
+        if (!function_exists('wc_get_product'))
+            return;
         $product = wc_get_product($post_id);
         if (!$product)
             return;
@@ -36,6 +50,10 @@ class APlus_D1_Sync
         $seo_title = get_post_meta($post_id, 'rank_math_title', true);
         $seo_desc = get_post_meta($post_id, 'rank_math_description', true);
 
+        // 防死機保護：安全獲取品牌名稱
+        $brands = $this->get_safe_term_names($post_id, 'pa_brand');
+        $brand_name = !empty($brands) ? $brands[0] : '';
+
         $payload = array(
             'id' => $post_id,
             'sku' => $product->get_sku(),
@@ -43,9 +61,9 @@ class APlus_D1_Sync
             'content' => wp_strip_all_tags($post->post_content),
             'price' => $product->get_price(),
             'stock_status' => $product->get_stock_status(),
-            'categories' => wp_get_post_terms($post_id, 'product_cat', array('fields' => 'names')),
-            'tags' => wp_get_post_terms($post_id, 'product_tag', array('fields' => 'names')),
-            'brand' => wp_get_post_terms($post_id, 'pa_brand', array('fields' => 'names'))[0] ?? '',
+            'categories' => $this->get_safe_term_names($post_id, 'product_cat'),
+            'tags' => $this->get_safe_term_names($post_id, 'product_tag'),
+            'brand' => $brand_name,
             'attributes' => $product->get_attributes(),
             'term_ids' => wp_get_post_terms($post_id, array('product_cat', 'product_tag', 'pa_brand'), array('fields' => 'ids')),
             'image_url' => wp_get_attachment_url($product->get_image_id()),
@@ -73,8 +91,8 @@ class APlus_D1_Sync
                 'excerpt' => $post->post_excerpt,
                 'slug' => $post->post_name,
                 'status' => $post->post_status,
-                'categories' => wp_get_post_terms($post_id, 'category', array('fields' => 'names')),
-                'tags' => wp_get_post_terms($post_id, 'post_tag', array('fields' => 'names')),
+                'categories' => $this->get_safe_term_names($post_id, 'category'),
+                'tags' => $this->get_safe_term_names($post_id, 'post_tag'),
                 'term_ids' => wp_get_post_terms($post_id, array('category', 'post_tag'), array('fields' => 'ids')),
                 'image_url' => get_the_post_thumbnail_url($post_id, 'full'),
                 'seo_title' => get_post_meta($post_id, 'rank_math_title', true),
@@ -104,6 +122,9 @@ class APlus_D1_Sync
     public function sync_term($term_id, $tt_id, $taxonomy)
     {
         $term = get_term($term_id, $taxonomy);
+        if (!$term || is_wp_error($term))
+            return;
+
         $payload = array(
             'term_id' => $term_id,
             'name' => $term->name,
@@ -128,7 +149,9 @@ class APlus_D1_Sync
             'method' => 'POST',
             'headers' => array('Content-Type' => 'application/json'),
             'body' => json_encode($body),
-            'blocking' => false
+            'blocking' => false,
+            'timeout' => 5,
+            'sslverify' => false // 防連線失敗保護
         ));
     }
 }
