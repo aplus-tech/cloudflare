@@ -3,7 +3,8 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-    const ORIGIN = 'https://aplus-tech.com.hk';
+    // [Fix] 使用真實 IP 避免 DNS Loop (Shared Hosting)
+    const ORIGIN = 'http://74.117.152.12';
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
