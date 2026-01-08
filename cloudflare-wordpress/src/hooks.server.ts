@@ -24,6 +24,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     const kv = event.platform?.env?.HTML_CACHE;
     const cacheKey = `html:${url.pathname}${url.search}`;
 
+    // 支援手動清空快取
+    if (url.searchParams.has('purge') && kv) {
+        await kv.delete(cacheKey);
+    }
+
     if (kv && event.request.method === 'GET' && !isBypass && !url.searchParams.has('purge')) {
         try {
             const cachedHTML = await kv.get(cacheKey);
@@ -31,11 +36,12 @@ export const handle: Handle = async ({ event, resolve }) => {
         } catch (e) { }
     }
 
-    // 加入 history 參數來精確偵測死循環
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0, history: string[] = []): Promise<Response> {
         const currentPath = `${targetPath}${targetSearch}`;
+
+        // 偵測死循環並顯示目標網址
         if (history.includes(currentPath)) {
-            return new Response(`Redirect Loop Detected at Origin! Path: ${currentPath}`, { status: 500 });
+            return new Response(`Redirect Loop Detected at Origin!\nPath: ${currentPath}\nHistory: ${history.join(' -> ')}`, { status: 500 });
         }
         if (depth > 10) return new Response('Too many internal redirects', { status: 500 });
 
@@ -45,12 +51,14 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        // 【關鍵】必須傳送主域名作為 Host，配合 HTTPS 連線，cPanel 才會正確導向
+        // 【終極欺騙 Header】
         proxyHeaders.set('Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('X-Forwarded-Port', '443');
+        proxyHeaders.set('X-Forwarded-Ssl', 'on');
         proxyHeaders.set('HTTPS', 'on');
+        proxyHeaders.set('X-HTTPS', '1');
 
         const originResponse = await fetch(`${ORIGIN_URL}${targetPath}${targetSearch}`, {
             method: event.request.method,
@@ -63,10 +71,12 @@ export const handle: Handle = async ({ event, resolve }) => {
             const location = originResponse.headers.get('location');
             if (location) {
                 const locUrl = new URL(location, `https://${CUSTOM_DOMAIN}`);
-                // 如果跳轉目標是同一個站，則在內部跟隨
-                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
+
+                // 如果跳轉目標是同一個站（包括 www），則在內部跟隨
+                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === `www.${CUSTOM_DOMAIN}` || locUrl.hostname === 'origin.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1, [...history, currentPath]);
                 }
+
                 const newLocation = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
             }
@@ -86,6 +96,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                 ['http://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 ['https://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
+                [`http://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
                 ['origin.aplus-tech.com.hk', CUSTOM_DOMAIN],
                 [PAGES_DEV, CUSTOM_DOMAIN]
             ];
