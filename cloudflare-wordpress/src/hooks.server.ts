@@ -30,7 +30,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        // 增加到 10 次嘗試，並在錯誤訊息中顯示最後一次跳轉的網址，方便除錯
         if (depth > 10) return new Response(`Too many internal redirects. Last Path: ${targetPath}`, { status: 500 });
 
         const proxyHeaders = new Headers();
@@ -44,10 +43,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('X-Forwarded-Port', '443');
+        proxyHeaders.set('X-Forwarded-Ssl', 'on');
         proxyHeaders.set('HTTPS', 'on');
-        proxyHeaders.set('X-HTTPS', '1');
+        proxyHeaders.set('CF-Visitor', '{"scheme":"https"}'); // 模擬 Cloudflare 訪客
 
-        // Bypass LiteSpeed 或其他伺服器快取，確保拿到最新狀態
+        // Bypass LiteSpeed 或其他伺服器快取
         proxyHeaders.set('Cache-Control', 'no-cache');
         proxyHeaders.set('Pragma', 'no-cache');
         proxyHeaders.set('X-LSCACHE', 'off');
@@ -62,13 +62,12 @@ export const handle: Handle = async ({ event, resolve }) => {
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
-                // 如果跳轉去 cPanel 預設頁面
-                if (location.includes('defaultwebpage.cgi') || location.includes('cgi-sys')) {
-                    return new Response(`Origin redirected to cPanel default page. Host: ${CUSTOM_DOMAIN}, Path: ${targetPath}`, { status: 502 });
+                // 如果跳轉去同一個 URL，代表死循環
+                if (location === `https://${CUSTOM_DOMAIN}${targetPath}${targetSearch}` || location === `http://${CUSTOM_DOMAIN}${targetPath}${targetSearch}`) {
+                    return new Response(`Origin Loop Detected: Server is forcing redirect to ${location} even with HTTPS headers. Please check wp-config.php fix.`, { status: 500 });
                 }
 
                 const locUrl = new URL(location, `https://${CUSTOM_DOMAIN}`);
-                // 只要是跳轉回主域名或 origin 域名，都在內部消化
                 if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk' || locUrl.hostname === 'www.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
                 }
