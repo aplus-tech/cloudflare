@@ -5,9 +5,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
-    // 【雙重保險】優先使用 IP，如果報錯就用 origin 域名
-    const ORIGIN_IP = 'http://74.117.152.12';
-    const ORIGIN_DOMAIN = 'http://origin.aplus-tech.com.hk';
+    // 【終極修正】改回 HTTPS，但配合 Host Header 繞過 cPanel 跳轉
+    const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
 
     // 1. 強制跳轉返正式域名
     if (url.hostname.includes(PAGES_DEV)) {
@@ -57,26 +56,17 @@ export const handle: Handle = async ({ event, resolve }) => {
         proxyHeaders.set('X-Forwarded-Proto', 'https');
 
         try {
-            // 嘗試連線
-            let originResponse = await fetch(`${ORIGIN_IP}${url.pathname}${url.search}`, {
+            const originResponse = await fetch(`${ORIGIN_URL}${url.pathname}${url.search}`, {
                 headers: proxyHeaders,
                 redirect: 'manual'
             });
 
-            // 如果 IP 連線報 1003 或其他錯誤，轉用域名連線
-            if (originResponse.status === 1003 || originResponse.status === 403) {
-                originResponse = await fetch(`${ORIGIN_DOMAIN}${url.pathname}${url.search}`, {
-                    headers: proxyHeaders,
-                    redirect: 'manual'
-                });
-            }
-
+            // 處理跳轉
             if (originResponse.status === 301 || originResponse.status === 302) {
                 const location = originResponse.headers.get('location');
                 if (location) {
                     const newLocation = location
-                        .replace(ORIGIN_IP, `https://${CUSTOM_DOMAIN}`)
-                        .replace(ORIGIN_DOMAIN, `https://${CUSTOM_DOMAIN}`)
+                        .replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`)
                         .replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN)
                         .replace(PAGES_DEV, CUSTOM_DOMAIN);
                     return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
@@ -86,7 +76,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             const contentType = originResponse.headers.get('content-type') || '';
             if (contentType.includes('text/html') && originResponse.status === 200) {
                 let body = await originResponse.text();
-                body = body.split(ORIGIN_IP).join(`https://${CUSTOM_DOMAIN}`);
+                body = body.split(ORIGIN_URL).join(`https://${CUSTOM_DOMAIN}`);
                 body = body.split('origin.aplus-tech.com.hk').join(CUSTOM_DOMAIN);
                 body = body.split(PAGES_DEV).join(CUSTOM_DOMAIN);
 
