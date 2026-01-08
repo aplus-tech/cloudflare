@@ -3,8 +3,9 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-    // [Fix] 使用真實 IP 避免 DNS Loop (Shared Hosting)
-    const ORIGIN = 'http://74.117.152.12';
+
+    // [Fix] 使用原始域名，但透過 resolveOverride 指定 IP
+    const ORIGIN = 'https://aplus-tech.com.hk';
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
@@ -20,7 +21,10 @@ export const handle: Handle = async ({ event, resolve }) => {
         const assetUrl = `${ORIGIN}${path}${url.search}`;
         try {
             const assetResponse = await fetch(assetUrl, {
-                headers: { 'Host': 'aplus-tech.com.hk' }
+                headers: { 'Host': 'aplus-tech.com.hk' },
+                // [Fix] 使用 resolveOverride 強制指向源站 IP，避免 DNS Loop
+                // @ts-ignore
+                cf: { resolveOverride: '74.117.152.12' }
             });
 
             if (!assetResponse.ok) {
@@ -41,7 +45,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // [Fix] 增加 Cache Version 以便在部署新版本時強制刷新緩存
-    const CACHE_VERSION = 'v2'; // Bump version
+    const CACHE_VERSION = 'v4'; // Bump version
     const cacheKey = `html:${CACHE_VERSION}:${path}`;
     const kv = platform?.env.HTML_CACHE;
     const db = platform?.env.DB;
@@ -70,7 +74,10 @@ export const handle: Handle = async ({ event, resolve }) => {
                 ...Object.fromEntries(request.headers),
                 'Host': 'aplus-tech.com.hk'
             },
-            redirect: 'follow'
+            redirect: 'follow',
+            // [Fix] 使用 resolveOverride 強制指向源站 IP，避免 DNS Loop
+            // @ts-ignore
+            cf: { resolveOverride: '74.117.152.12' }
         });
 
         if (!response.ok && response.status !== 404) {
