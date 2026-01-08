@@ -4,8 +4,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
-
-    // 【最終方案】使用 DNS Only 的 origin 域名，走 HTTP 避開 1003 同 526
     const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
 
     if (url.pathname.startsWith('/api')) return resolve(event);
@@ -32,7 +30,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 5) return new Response('Too many internal redirects. Please ensure cPanel Force HTTPS is OFF.', { status: 500 });
+        if (depth > 5) return new Response('Too many internal redirects. Please ensure cPanel settings are correct.', { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -40,8 +38,9 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        // 傳送主域名作為 Host，讓 WordPress 認得
-        proxyHeaders.set('Host', CUSTOM_DOMAIN);
+        // 【關鍵修正】Host 必須匹配 Alias 域名，cPanel 才會正確導向到 public_html
+        // 因為 wp-config.php 已經定義了 WP_HOME，所以 WordPress 依然會以 aplus-tech.com.hk 運行
+        proxyHeaders.set('Host', 'origin.aplus-tech.com.hk');
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('HTTPS', 'on');
@@ -56,6 +55,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
+                // 如果還是跳轉到預設頁面，代表 cPanel Alias 尚未生效或有衝突
+                if (location.includes('defaultwebpage.cgi')) {
+                    return new Response('Origin redirected to cPanel default page. Please wait a few minutes for Alias to propagate.', { status: 500 });
+                }
+
                 const locUrl = new URL(location);
                 if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
