@@ -6,7 +6,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
     const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
 
-    // 1. 強制跳轉返正式域名
+    // 1. 強制跳轉返正式域名 (防止 pages.dev 洩漏)
     if (url.hostname.includes(PAGES_DEV)) {
         return new Response(null, {
             status: 301,
@@ -23,10 +23,12 @@ export const handle: Handle = async ({ event, resolve }) => {
     const cookies = event.request.headers.get('cookie') || '';
     const isLoggedIn = cookies.includes('wordpress_logged_in_');
 
-    // 4. KV Cache
+    // 4. KV Cache 邏輯 (只限 GET 且未登入)
     // @ts-ignore
     const kv = event.platform?.env?.HTML_CACHE;
-    if (kv && event.request.method === 'GET' && !isLoggedIn) {
+    const isNoCache = event.request.headers.get('cache-control')?.includes('no-cache');
+
+    if (kv && event.request.method === 'GET' && !isLoggedIn && !isNoCache) {
         try {
             const normalizedPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
             const cacheKey = `html:${normalizedPath}${url.search}`;
@@ -40,79 +42,93 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // 5. Proxy 邏輯
-    const proxyHeaders = new Headers();
-    ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type'].forEach(h => {
-        const val = event.request.headers.get(h);
-        if (val) proxyHeaders.set(h, val);
-    });
+    let response = await resolve(event);
 
-    proxyHeaders.set('Host', CUSTOM_DOMAIN);
-    proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
-    proxyHeaders.set('X-Forwarded-Proto', 'https');
-    proxyHeaders.set('HTTPS', 'on');
-
-    try {
-        const originResponse = await fetch(`${ORIGIN_URL}${url.pathname}${url.search}`, {
-            method: event.request.method,
-            headers: proxyHeaders,
-            body: event.request.method !== 'GET' && event.request.method !== 'HEAD' ? await event.request.arrayBuffer() : null,
-            redirect: 'manual'
+    if (response.status === 404) {
+        const proxyHeaders = new Headers();
+        ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type'].forEach(h => {
+            const val = event.request.headers.get(h);
+            if (val) proxyHeaders.set(h, val);
         });
 
-        // 處理跳轉
-        if (originResponse.status === 301 || originResponse.status === 302) {
-            const location = originResponse.headers.get('location');
-            if (location) {
-                const newLocation = location
-                    .replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`)
-                    .replace(`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`)
-                    .replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN)
-                    .replace(PAGES_DEV, CUSTOM_DOMAIN);
-                return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
+        proxyHeaders.set('Host', CUSTOM_DOMAIN);
+        proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
+        proxyHeaders.set('X-Forwarded-Proto', 'https');
+        proxyHeaders.set('HTTPS', 'on');
+
+        try {
+            const originResponse = await fetch(`${ORIGIN_URL}${url.pathname}${url.search}`, {
+                method: event.request.method,
+                headers: proxyHeaders,
+                body: event.request.method !== 'GET' && event.request.method !== 'HEAD' ? await event.request.arrayBuffer() : null,
+                redirect: 'manual'
+            });
+
+            // 【關鍵】處理所有資源的跳轉 (包括圖片、CSS)
+            if (originResponse.status === 301 || originResponse.status === 302) {
+                const location = originResponse.headers.get('location');
+                if (location) {
+                    const newLocation = location
+                        .replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`)
+                        .replace(`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`)
+                        .replace(`http://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`)
+                        .replace(`https://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`)
+                        .replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN)
+                        .replace(PAGES_DEV, CUSTOM_DOMAIN);
+                    return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
+                }
             }
+
+            const contentType = originResponse.headers.get('content-type') || '';
+
+            // 針對 HTML, CSS, JS 進行強力網址替換
+            if (contentType.includes('text/html') || contentType.includes('css') || contentType.includes('javascript') || contentType.includes('json')) {
+                let body = await originResponse.text();
+
+                const replacements = [
+                    [ORIGIN_URL, `https://${CUSTOM_DOMAIN}`],
+                    [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
+                    [`http://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
+                    [`https://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
+                    ['origin.aplus-tech.com.hk', CUSTOM_DOMAIN],
+                    [PAGES_DEV, CUSTOM_DOMAIN],
+                    // 處理 JSON 轉義網址
+                    ['http:\\/\\/origin.aplus-tech.com.hk', `https:\\/\\/${CUSTOM_DOMAIN}`],
+                    [`http:\\/\\/${CUSTOM_DOMAIN}`, `https:\\/\\/${CUSTOM_DOMAIN}`],
+                    [`http:\\/\\/www.${CUSTOM_DOMAIN}`, `https:\\/\\/${CUSTOM_DOMAIN}`]
+                ];
+
+                for (const [from, to] of replacements) {
+                    body = body.split(from).join(to);
+                }
+
+                const newHeaders = new Headers(originResponse.headers);
+                newHeaders.delete('content-encoding');
+                newHeaders.delete('content-length');
+                newHeaders.set('X-Edge-Cache', 'Miss');
+
+                const finalResponse = new Response(body, { status: originResponse.status, headers: newHeaders });
+
+                // 存入 KV (只限 HTML)
+                if (kv && contentType.includes('text/html') && originResponse.status === 200 && !isLoggedIn) {
+                    const normalizedPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
+                    const cacheKey = `html:${normalizedPath}${url.search}`;
+                    event.platform.context.waitUntil(kv.put(cacheKey, body, { expirationTtl: 604800 }));
+                }
+
+                return finalResponse;
+            }
+
+            // 圖片或其他資源
+            return new Response(originResponse.body, {
+                status: originResponse.status,
+                headers: originResponse.headers
+            });
+
+        } catch (err: any) {
+            return new Response(`Origin Connection Error: ${err.message}`, { status: 502 });
         }
-
-        const contentType = originResponse.headers.get('content-type') || '';
-
-        if (contentType.includes('text/html') || contentType.includes('text/css') || contentType.includes('application/javascript')) {
-            let body = await originResponse.text();
-
-            // 【超級強力替換】確保所有 HTTP 連結都變做 HTTPS
-            const replacements = [
-                [ORIGIN_URL, `https://${CUSTOM_DOMAIN}`],
-                [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`], // 解決 Mixed Content 關鍵！
-                ['origin.aplus-tech.com.hk', CUSTOM_DOMAIN],
-                [PAGES_DEV, CUSTOM_DOMAIN],
-                ['http:\\/\\/origin.aplus-tech.com.hk', `https:\\/\\/${CUSTOM_DOMAIN}`],
-                [`http:\\/\\/${CUSTOM_DOMAIN}`, `https:\\/\\/${CUSTOM_DOMAIN}`]
-            ];
-
-            for (const [from, to] of replacements) {
-                body = body.split(from).join(to);
-            }
-
-            const newHeaders = new Headers(originResponse.headers);
-            newHeaders.delete('content-encoding');
-            newHeaders.delete('content-length');
-            newHeaders.set('X-Edge-Cache', 'Miss');
-
-            const finalResponse = new Response(body, { status: 200, headers: newHeaders });
-
-            if (kv && contentType.includes('text/html') && originResponse.status === 200 && !isLoggedIn) {
-                const normalizedPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
-                const cacheKey = `html:${normalizedPath}${url.search}`;
-                event.platform.context.waitUntil(kv.put(cacheKey, body, { expirationTtl: 604800 }));
-            }
-
-            return finalResponse;
-        }
-
-        return new Response(originResponse.body, {
-            status: originResponse.status,
-            headers: originResponse.headers
-        });
-
-    } catch (err: any) {
-        return new Response(`Origin Connection Error: ${err.message}`, { status: 502 });
     }
+
+    return response;
 };
