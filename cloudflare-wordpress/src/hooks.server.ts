@@ -15,8 +15,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
     const cacheKey = `html:${normalizedPath}${cleanSearch ? '?' + cleanSearch : ''}`;
 
-    // 【終極修復】直接用 IP 同 HTTP，解決 SSL 526 錯誤
-    const ORIGIN_IP = 'http://74.117.152.12';
+    // 使用你設定好的 DNS Only 域名，並用 HTTP 避免 SSL 526 錯誤
+    const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
@@ -51,22 +51,21 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (response.status === 404) {
         const proxyHeaders = new Headers(event.request.headers);
-        proxyHeaders.set('Host', CUSTOM_DOMAIN); // 必須話俾 WordPress 聽我係 aplus-tech.com.hk
+        proxyHeaders.set('Host', CUSTOM_DOMAIN); // 告訴 WordPress 它是 aplus-tech.com.hk
         proxyHeaders.set('Referer', `https://${CUSTOM_DOMAIN}`);
 
         try {
-            const originResponse = await fetch(`${ORIGIN_IP}${url.pathname}${url.search}`, {
+            const originResponse = await fetch(`${ORIGIN_URL}${url.pathname}${url.search}`, {
                 headers: proxyHeaders,
                 redirect: 'manual'
             });
 
-            // 處理跳轉
+            // 處理跳轉：確保所有跳轉都強制換回正式域名
             if (originResponse.status === 301 || originResponse.status === 302) {
                 const location = originResponse.headers.get('location');
                 if (location) {
-                    // 確保所有跳轉都返去正式域名
                     const newLocation = location
-                        .replace(ORIGIN_IP, `https://${CUSTOM_DOMAIN}`)
+                        .replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`)
                         .replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN)
                         .replace(PAGES_DEV, CUSTOM_DOMAIN);
 
@@ -82,8 +81,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (contentType.includes('text/html') && originResponse.status === 200) {
                 let body = await originResponse.text();
 
-                // 【強力替換】確保 HTML 入面唔會出現任何唔應該出現嘅網址
-                body = body.split(ORIGIN_IP).join(`https://${CUSTOM_DOMAIN}`);
+                // 【強力替換】將所有可能的錯誤網址全部換回 aplus-tech.com.hk
+                body = body.split(ORIGIN_URL).join(`https://${CUSTOM_DOMAIN}`);
                 body = body.split('origin.aplus-tech.com.hk').join(CUSTOM_DOMAIN);
                 body = body.split(PAGES_DEV).join(CUSTOM_DOMAIN);
 
@@ -95,7 +94,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 
                 response = new Response(body, { status: 200, headers: newHeaders });
             } else {
-                // 靜態資源或其他
                 response = new Response(originResponse.body, {
                     status: originResponse.status,
                     headers: originResponse.headers
