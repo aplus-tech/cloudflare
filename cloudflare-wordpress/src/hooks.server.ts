@@ -41,7 +41,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // [Fix] 增加 Cache Version 以便在部署新版本時強制刷新緩存
-    const CACHE_VERSION = 'v1';
+    const CACHE_VERSION = 'v2'; // Bump version
     const cacheKey = `html:${CACHE_VERSION}:${path}`;
     const kv = platform?.env.HTML_CACHE;
     const db = platform?.env.DB;
@@ -74,7 +74,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         });
 
         if (!response.ok && response.status !== 404) {
-            return resolve(event);
+            // [Debug] 如果 Proxy 失敗，回傳錯誤訊息以便除錯
+            console.error(`Proxy failed: ${response.status} ${response.statusText}`);
+            return new Response(`Proxy Error: ${response.status} ${response.statusText} - Target: ${targetUrl}`, { status: 502 });
         }
 
         let html = await response.text();
@@ -105,8 +107,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             headers: { 'Content-Type': 'text/html; charset=UTF-8', 'X-Cache': 'MISS' }
         });
 
-    } catch (e) {
+    } catch (e: any) {
         console.error('Proxy Error:', e);
-        return resolve(event);
+        return new Response(`Internal Proxy Error: ${e.message}`, { status: 500 });
     }
 };
