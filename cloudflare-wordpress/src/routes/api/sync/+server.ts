@@ -65,6 +65,7 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
 async function performSync(data: any, platform: any) {
     const { type, payload } = data;
     const db = platform.env.DB;
+    let result = { image_r2_path: null, gallery_r2_paths: [] };
 
     if (type === 'product') {
         const id = payload.id;
@@ -87,12 +88,17 @@ async function performSync(data: any, platform: any) {
         let image_url = payload.image_url ?? null;
         if (image_url) {
             image_url = await syncImageToR2(image_url, 'product', brand || 'unknown', title || 'unknown', platform);
+            // @ts-ignore
+            result.image_r2_path = image_url; // syncImageToR2 returns the path
         }
 
         let gallery_images = [];
         if (Array.isArray(gallery_images_raw)) {
             for (const img of gallery_images_raw) {
-                gallery_images.push(await syncImageToR2(img, 'product', brand || 'unknown', title || 'unknown', platform));
+                const r2Path = await syncImageToR2(img, 'product', brand || 'unknown', title || 'unknown', platform);
+                gallery_images.push(r2Path);
+                // @ts-ignore
+                result.gallery_r2_paths.push(r2Path);
             }
         }
         const gallery_json = JSON.stringify(gallery_images);
@@ -108,6 +114,7 @@ async function performSync(data: any, platform: any) {
             Math.floor(Date.now() / 1000)
         ).run();
     }
+    return result;
 }
 
 export const POST: RequestHandler = async ({ request, platform }) => {
@@ -119,10 +126,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // [Guess: 改為同步執行以便除錯]
-        // 暫時移除背景執行，確保圖片同步完成
-        await performSync(data, platform);
-        return json({ success: true, message: 'Sync completed' });
+        // [Verified: Phase 4.6: R2 圖片加速整合]
+        // 同步執行並獲取 R2 路徑回傳給 WordPress
+        const syncResult = await performSync(data, platform);
+        return json({ success: true, message: 'Sync completed', r2_data: syncResult });
     } catch (e: any) {
         console.error('Sync Error:', e.message);
         return json({ error: 'Internal Server Error' }, { status: 500 });
