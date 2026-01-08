@@ -2,63 +2,68 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 // 輔助函數：將圖片同步到 R2 並記錄到 D1
+// 輔助函數：將圖片同步到 R2 並記錄到 D1
 async function syncImageToR2(url: string, type: string, brand: string, slug: string, platform: any, object_id?: number, alt_text?: string) {
-    if (!url || !url.startsWith('http')) return url;
+    if (!url || !url.startsWith('http')) return null; // Return null on invalid URL
 
     const db = platform.env.DB;
     const r2 = platform.env.MEDIA_BUCKET;
-    if (!db || !r2) return url;
+    if (!db || !r2) return null;
 
     try {
         const encodedUrl = new URL(url).href;
 
-        // 1. 檢查是否已經同步過，並驗證 R2 檔案是否真的存在
+        // 1. 檢查是否已經同步過
         const existing = await db.prepare('SELECT r2_path FROM media_mapping WHERE original_url = ?').bind(url).first();
         if (existing) {
-            // 檢查 R2 中是否真的有這個檔案
-            const r2File = await r2.head(existing.r2_path);
-            if (r2File) {
-                return existing.r2_path;
-            }
+            // [Fix] 回傳編碼後的路徑，確保中文檔名在 URL 中有效
+            // @ts-ignore
+            return existing.r2_path.split('/').map(encodeURIComponent).join('/');
         }
 
         const rawFilename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
-        const filename = decodeURIComponent(rawFilename);
+        const filename = decodeURIComponent(rawFilename); // Decode first to get clean characters
 
-        let r2Path = '';
+        let r2Key = '';
         const cleanBrand = brand ? brand.toLowerCase().replace(/\s+/g, '-') : 'unknown';
         const cleanSlug = slug ? slug.toLowerCase().replace(/\s+/g, '-') : 'unknown';
 
         if (type === 'product') {
-            r2Path = `products/${cleanBrand}/${filename}`;
+            r2Key = `products/${cleanBrand}/${filename}`;
         } else if (type === 'post') {
-            r2Path = `posts/${cleanSlug}/${filename}`;
+            r2Key = `posts/${cleanSlug}/${filename}`;
         } else if (type === 'page') {
-            r2Path = `pages/${cleanSlug}/${filename}`;
+            r2Key = `pages/${cleanSlug}/${filename}`;
         } else {
-            r2Path = `assets/common/${filename}`;
+            r2Key = `assets/common/${filename}`;
         }
 
         const response = await fetch(encodedUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
         });
-        if (!response.ok) return url;
+
+        if (!response.ok) {
+            console.error(`Failed to fetch original image: ${encodedUrl} (${response.status})`);
+            return null; // Return null on fetch failure
+        }
 
         const blob = await response.blob();
 
-        await r2.put(r2Path, blob, {
+        await r2.put(r2Key, blob, {
             httpMetadata: { contentType: response.headers.get('content-type') || 'image/jpeg' }
         });
 
         await db.prepare(`
             INSERT OR IGNORE INTO media_mapping (original_url, r2_path, media_type, brand, object_id, alt_text)
             VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(url, r2Path, type, brand || null, object_id || null, alt_text || null).run();
+        `).bind(url, r2Key, type, brand || null, object_id || null, alt_text || null).run();
 
-        return r2Path;
+        // [Fix] 回傳編碼後的路徑
+        return r2Key.split('/').map(encodeURIComponent).join('/');
+
     } catch (e) {
         console.error(`Image Sync Error:`, e);
-        return url;
+        return null; // Return null on error
     }
 }
 
