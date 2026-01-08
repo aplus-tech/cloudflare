@@ -1,14 +1,21 @@
 <?php
 /**
  * Plugin Name: A Plus D1 Data Sync
- * Description: Sync WordPress products to Cloudflare D1.
+ * Description: Sync WordPress products to Cloudflare D1 with HTTPS Fix.
  */
 
 if (!defined('ABSPATH'))
     exit;
 
+// 【關鍵修復】解決 Cloudflare Flexible/Proxy 模式下的無限跳轉問題
+// 當 WordPress 位於 Cloudflare Worker Proxy 後面時，確保它知道請求是 HTTPS
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+
 class APlus_D1_Sync
 {
+    // 指向 Cloudflare Pages 的 Sync API
     private $sync_url = 'https://cloudflare-9qe.pages.dev/api/sync';
     private $secret_key = 'Lui@63006021';
 
