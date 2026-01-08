@@ -39,7 +39,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         }
     }
 
-    const cacheKey = `html:${path}`;
+    // [Fix] 增加 Cache Version 以便在部署新版本時強制刷新緩存
+    const CACHE_VERSION = 'v1';
+    const cacheKey = `html:${CACHE_VERSION}:${path}`;
     const kv = platform?.env.HTML_CACHE;
     const db = platform?.env.DB;
 
@@ -79,6 +81,8 @@ export const handle: Handle = async ({ event, resolve }) => {
         // 5. 內容替換 (域名與 R2 媒體)
         const workerHost = url.host;
         html = html.split('aplus-tech.com.hk').join(workerHost);
+        // [Fix] 同時替換 Worker 預覽域名，防止舊連結殘留
+        html = html.split('cloudflare-9qe.pages.dev').join(workerHost);
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
