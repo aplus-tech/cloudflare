@@ -3,29 +3,30 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
 
-    // 1. 統一 Cache Key (移除追蹤碼，處理結尾斜槓)
+    // 1. 統一 Cache Key
     const searchParams = new URLSearchParams(url.search);
     const trackingParams = ['fbclid', 'gclid', 'utm_source', 'utm_medium', 'utm_campaign'];
     trackingParams.forEach(p => searchParams.delete(p));
     const cleanSearch = searchParams.toString();
 
-    // 統一將路徑結尾的 / 去掉來做 Key (除非是根目錄)
     let normalizedPath = url.pathname;
     if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
         normalizedPath = normalizedPath.slice(0, -1);
     }
     const cacheKey = `html:${normalizedPath}${cleanSearch ? '?' + cleanSearch : ''}`;
 
-    const ORIGIN = 'https://aplus-tech.com.hk';
-    const ORIGIN_HOST = new URL(ORIGIN).host;
-    const currentHost = url.host;
+    // 【關鍵修復】ORIGIN 必須係一個「唔同名」嘅網址，否則會 1019 無限迴圈
+    // 請喺 DNS 加一條 origin.aplus-tech.com.hk 指向你原本個 WordPress Server IP
+    const ORIGIN = 'https://origin.aplus-tech.com.hk';
+    const ORIGIN_HOST = 'aplus-tech.com.hk'; // 原始 Host 名稱
+    const CUSTOM_DOMAIN = 'aplus-tech.com.hk'; // 你想客見到嘅域名
 
     // 2. 排除非 GET 請求或特定路徑
     if (event.request.method !== 'GET' || url.pathname.startsWith('/api') || url.pathname.startsWith('/admin')) {
         return resolve(event);
     }
 
-    // 3. 檢查登入
+    // 3. 檢查登入 (登入咗就直接 resolve，唔行 Cache)
     const cookies = event.request.headers.get('cookie') || '';
     if (cookies.includes('wordpress_logged_in_')) return resolve(event);
 
@@ -51,19 +52,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (response.status === 404) {
         const proxyHeaders = new Headers(event.request.headers);
-        proxyHeaders.set('Host', ORIGIN_HOST);
-        proxyHeaders.set('Referer', ORIGIN);
+        proxyHeaders.set('Host', ORIGIN_HOST); // 話俾 WordPress 聽我係 aplus-tech.com.hk
+        proxyHeaders.set('Referer', `https://${ORIGIN_HOST}`);
 
         const originResponse = await fetch(`${ORIGIN}${url.pathname}${url.search}`, {
             headers: proxyHeaders,
-            redirect: 'manual' // 手動處理跳轉
+            redirect: 'manual'
         });
 
-        // 處理 WordPress 的 301/302 跳轉
+        // 處理跳轉：確保唔會跳去 pages.dev
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
-                const newLocation = location.replace(ORIGIN_HOST, currentHost).replace('www.' + ORIGIN_HOST, currentHost);
+                // 將所有 origin 網址換返做正式域名
+                const newLocation = location.replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN).replace(ORIGIN_HOST, CUSTOM_DOMAIN);
                 return new Response(null, {
                     status: originResponse.status,
                     headers: { 'location': newLocation }
@@ -75,9 +77,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         if (contentType.includes('text/html') && originResponse.status === 200) {
             let body = await originResponse.text();
-            // 替換所有域名連結
-            body = body.split(ORIGIN_HOST).join(currentHost);
-            body = body.split('www.' + ORIGIN_HOST).join(currentHost);
+
+            // 【關鍵修復】將所有網址換返做正式域名，唔准出現 pages.dev
+            body = body.split('origin.aplus-tech.com.hk').join(CUSTOM_DOMAIN);
+            body = body.split('cloudflare-9qe.pages.dev').join(CUSTOM_DOMAIN);
+            body = body.split(ORIGIN_HOST).join(CUSTOM_DOMAIN);
 
             const newHeaders = new Headers(originResponse.headers);
             newHeaders.delete('content-encoding');
@@ -87,10 +91,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
             response = new Response(body, { status: 200, headers: newHeaders });
         } else {
-            // 靜態資源加速
-            const assetHeaders = new Headers(originResponse.headers);
-            assetHeaders.set('Cache-Control', 'public, max-age=31536000, immutable');
-            response = new Response(originResponse.body, { status: originResponse.status, headers: assetHeaders });
+            response = new Response(originResponse.body, {
+                status: originResponse.status,
+                headers: originResponse.headers
+            });
         }
     }
 
