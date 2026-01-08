@@ -113,14 +113,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 恢復背景執行，讓 WordPress 不用等待
-        if (platform.context?.waitUntil) {
-            platform.context.waitUntil(performSync(data, platform));
-            return json({ success: true, message: 'Sync started in background' });
-        } else {
-            await performSync(data, platform);
-            return json({ success: true });
-        }
+        // [Guess: 改為同步執行以便除錯]
+        // 暫時移除背景執行，確保圖片同步完成
+        await performSync(data, platform);
+        return json({ success: true, message: 'Sync completed' });
     } catch (e: any) {
         console.error('Sync Error:', e.message);
         return json({ error: 'Internal Server Error' }, { status: 500 });
