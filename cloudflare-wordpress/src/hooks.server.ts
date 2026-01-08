@@ -4,7 +4,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
-    const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
+
+    // 【終極穩定版】直接使用 IP 連線，避開所有 DNS 同 SSL 526 問題
+    const ORIGIN_IP = 'http://74.117.152.12';
 
     if (url.pathname.startsWith('/api')) return resolve(event);
 
@@ -29,9 +31,8 @@ export const handle: Handle = async ({ event, resolve }) => {
         } catch (e) { }
     }
 
-    // Proxy 核心邏輯
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 5) return new Response('Too many internal redirects - Please check cPanel Force HTTPS setting', { status: 500 });
+        if (depth > 5) return new Response('Too many internal redirects. Please ensure "Force HTTPS Redirect" is OFF in cPanel.', { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -39,34 +40,33 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        // 【關鍵修正】使用 origin 作為 Host，確保 cPanel 認得
-        proxyHeaders.set('Host', 'origin.aplus-tech.com.hk');
+        // 必須傳送主域名作為 Host，cPanel 先至認得
+        proxyHeaders.set('Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('HTTPS', 'on');
 
-        const originResponse = await fetch(`${ORIGIN_URL}${targetPath}${targetSearch}`, {
+        const originResponse = await fetch(`${ORIGIN_IP}${targetPath}${targetSearch}`, {
             method: event.request.method,
             headers: proxyHeaders,
             body: event.request.method !== 'GET' && event.request.method !== 'HEAD' ? await event.request.arrayBuffer() : null,
             redirect: 'manual'
         });
 
-        // 處理跳轉
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
-                // 如果跳轉去 cPanel 預設頁面，即係 Host 仲係有問題
+                // 如果 Origin 仲係想跳去 defaultwebpage，代表 Host Header 仲係有問題或者 Server 仲係想強制 HTTPS
                 if (location.includes('defaultwebpage.cgi')) {
-                    return new Response('Origin Server redirected to cPanel default page. Please check Domain Alias settings.', { status: 500 });
+                    return new Response('Origin redirected to default page. Please ensure cPanel Alias and Force HTTPS settings are correct.', { status: 500 });
                 }
 
                 const locUrl = new URL(location);
-                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
+                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk' || locUrl.hostname === '74.117.152.12') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
                 }
 
-                const newLocation = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
+                const newLocation = location.replace(ORIGIN_IP, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
             }
         }
@@ -80,8 +80,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         if (contentType.includes('text/html') || contentType.includes('css') || contentType.includes('javascript') || contentType.includes('json')) {
             let body = await originResponse.text();
+
+            // 替換所有可能的 Origin 網址
             const replacements = [
-                [ORIGIN_URL, `https://${CUSTOM_DOMAIN}`],
+                [ORIGIN_IP, `https://${CUSTOM_DOMAIN}`],
                 ['http://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 ['https://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
