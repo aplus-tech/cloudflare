@@ -7,15 +7,21 @@
 if (!defined('ABSPATH'))
     exit;
 
-// 【關鍵修復】解決 Cloudflare Flexible/Proxy 模式下的無限跳轉問題
-// 當 WordPress 位於 Cloudflare Worker Proxy 後面時，確保它知道請求是 HTTPS
+// 【終極 HTTPS 修復】
+// 無論如何，只要係 Cloudflare 嚟嘅，就當係 HTTPS
 if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
     $_SERVER['HTTPS'] = 'on';
+    $_SERVER['SERVER_PORT'] = 443;
+} elseif (isset($_SERVER['HTTP_CF_VISITOR'])) {
+    $visitor = json_decode($_SERVER['HTTP_CF_VISITOR']);
+    if ($visitor->scheme === 'https') {
+        $_SERVER['HTTPS'] = 'on';
+        $_SERVER['SERVER_PORT'] = 443;
+    }
 }
 
 class APlus_D1_Sync
 {
-    // 指向 Cloudflare Pages 的 Sync API
     private $sync_url = 'https://cloudflare-9qe.pages.dev/api/sync';
     private $secret_key = 'Lui@63006021';
 
