@@ -15,18 +15,17 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
     const cacheKey = `html:${normalizedPath}${cleanSearch ? '?' + cleanSearch : ''}`;
 
-    // 【關鍵修復】ORIGIN 必須係一個「唔同名」嘅網址，否則會 1019 無限迴圈
-    // 請喺 DNS 加一條 origin.aplus-tech.com.hk 指向你原本個 WordPress Server IP
-    const ORIGIN = 'https://origin.aplus-tech.com.hk';
-    const ORIGIN_HOST = 'aplus-tech.com.hk'; // 原始 Host 名稱
-    const CUSTOM_DOMAIN = 'aplus-tech.com.hk'; // 你想客見到嘅域名
+    // 【終極修復】直接用 IP 同 HTTP，解決 SSL 526 錯誤
+    const ORIGIN_IP = 'http://74.117.152.12';
+    const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
+    const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
     // 2. 排除非 GET 請求或特定路徑
     if (event.request.method !== 'GET' || url.pathname.startsWith('/api') || url.pathname.startsWith('/admin')) {
         return resolve(event);
     }
 
-    // 3. 檢查登入 (登入咗就直接 resolve，唔行 Cache)
+    // 3. 檢查登入
     const cookies = event.request.headers.get('cookie') || '';
     if (cookies.includes('wordpress_logged_in_')) return resolve(event);
 
@@ -52,49 +51,58 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (response.status === 404) {
         const proxyHeaders = new Headers(event.request.headers);
-        proxyHeaders.set('Host', ORIGIN_HOST); // 話俾 WordPress 聽我係 aplus-tech.com.hk
-        proxyHeaders.set('Referer', `https://${ORIGIN_HOST}`);
+        proxyHeaders.set('Host', CUSTOM_DOMAIN); // 必須話俾 WordPress 聽我係 aplus-tech.com.hk
+        proxyHeaders.set('Referer', `https://${CUSTOM_DOMAIN}`);
 
-        const originResponse = await fetch(`${ORIGIN}${url.pathname}${url.search}`, {
-            headers: proxyHeaders,
-            redirect: 'manual'
-        });
+        try {
+            const originResponse = await fetch(`${ORIGIN_IP}${url.pathname}${url.search}`, {
+                headers: proxyHeaders,
+                redirect: 'manual'
+            });
 
-        // 處理跳轉：確保唔會跳去 pages.dev
-        if (originResponse.status === 301 || originResponse.status === 302) {
-            const location = originResponse.headers.get('location');
-            if (location) {
-                // 將所有 origin 網址換返做正式域名
-                const newLocation = location.replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN).replace(ORIGIN_HOST, CUSTOM_DOMAIN);
-                return new Response(null, {
+            // 處理跳轉
+            if (originResponse.status === 301 || originResponse.status === 302) {
+                const location = originResponse.headers.get('location');
+                if (location) {
+                    // 確保所有跳轉都返去正式域名
+                    const newLocation = location
+                        .replace(ORIGIN_IP, `https://${CUSTOM_DOMAIN}`)
+                        .replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN)
+                        .replace(PAGES_DEV, CUSTOM_DOMAIN);
+
+                    return new Response(null, {
+                        status: originResponse.status,
+                        headers: { 'location': newLocation }
+                    });
+                }
+            }
+
+            const contentType = originResponse.headers.get('content-type') || '';
+
+            if (contentType.includes('text/html') && originResponse.status === 200) {
+                let body = await originResponse.text();
+
+                // 【強力替換】確保 HTML 入面唔會出現任何唔應該出現嘅網址
+                body = body.split(ORIGIN_IP).join(`https://${CUSTOM_DOMAIN}`);
+                body = body.split('origin.aplus-tech.com.hk').join(CUSTOM_DOMAIN);
+                body = body.split(PAGES_DEV).join(CUSTOM_DOMAIN);
+
+                const newHeaders = new Headers(originResponse.headers);
+                newHeaders.delete('content-encoding');
+                newHeaders.delete('content-length');
+                newHeaders.set('Content-Type', 'text/html; charset=UTF-8');
+                newHeaders.set('X-Edge-Cache', 'Miss');
+
+                response = new Response(body, { status: 200, headers: newHeaders });
+            } else {
+                // 靜態資源或其他
+                response = new Response(originResponse.body, {
                     status: originResponse.status,
-                    headers: { 'location': newLocation }
+                    headers: originResponse.headers
                 });
             }
-        }
-
-        const contentType = originResponse.headers.get('content-type') || '';
-
-        if (contentType.includes('text/html') && originResponse.status === 200) {
-            let body = await originResponse.text();
-
-            // 【關鍵修復】將所有網址換返做正式域名，唔准出現 pages.dev
-            body = body.split('origin.aplus-tech.com.hk').join(CUSTOM_DOMAIN);
-            body = body.split('cloudflare-9qe.pages.dev').join(CUSTOM_DOMAIN);
-            body = body.split(ORIGIN_HOST).join(CUSTOM_DOMAIN);
-
-            const newHeaders = new Headers(originResponse.headers);
-            newHeaders.delete('content-encoding');
-            newHeaders.delete('content-length');
-            newHeaders.set('Content-Type', 'text/html; charset=UTF-8');
-            newHeaders.set('X-Edge-Cache', 'Miss');
-
-            response = new Response(body, { status: 200, headers: newHeaders });
-        } else {
-            response = new Response(originResponse.body, {
-                status: originResponse.status,
-                headers: originResponse.headers
-            });
+        } catch (err: any) {
+            return new Response(`Origin Connection Error: ${err.message}`, { status: 502 });
         }
     }
 
