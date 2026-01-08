@@ -3,9 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-
-    // [Fix] 使用 HTTPS IP 並忽略證書錯誤 (Shared Hosting 唯一解法)
-    const ORIGIN = 'https://74.117.152.12';
+    const ORIGIN = 'https://aplus-tech.com.hk';
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
@@ -21,10 +19,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         const assetUrl = `${ORIGIN}${path}${url.search}`;
         try {
             const assetResponse = await fetch(assetUrl, {
-                headers: { 'Host': 'aplus-tech.com.hk' },
-                // [Fix] 忽略 SSL 證書錯誤 (因為 IP 不匹配域名)
-                // @ts-ignore
-                cf: { rejectUnauthorized: false }
+                headers: { 'Host': 'aplus-tech.com.hk' }
             });
 
             if (!assetResponse.ok) {
@@ -44,9 +39,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         }
     }
 
-    // [Fix] 增加 Cache Version 以便在部署新版本時強制刷新緩存
-    const CACHE_VERSION = 'v5'; // Bump version
-    const cacheKey = `html:${CACHE_VERSION}:${path}`;
+    const cacheKey = `html:${path}`;
     const kv = platform?.env.HTML_CACHE;
     const db = platform?.env.DB;
 
@@ -74,16 +67,11 @@ export const handle: Handle = async ({ event, resolve }) => {
                 ...Object.fromEntries(request.headers),
                 'Host': 'aplus-tech.com.hk'
             },
-            redirect: 'follow',
-            // [Fix] 忽略 SSL 證書錯誤
-            // @ts-ignore
-            cf: { rejectUnauthorized: false }
+            redirect: 'follow'
         });
 
         if (!response.ok && response.status !== 404) {
-            // [Debug] 如果 Proxy 失敗，回傳錯誤訊息以便除錯
-            console.error(`Proxy failed: ${response.status} ${response.statusText}`);
-            return new Response(`Proxy Error: ${response.status} ${response.statusText} - Target: ${targetUrl}`, { status: 502 });
+            return resolve(event);
         }
 
         let html = await response.text();
@@ -91,8 +79,6 @@ export const handle: Handle = async ({ event, resolve }) => {
         // 5. 內容替換 (域名與 R2 媒體)
         const workerHost = url.host;
         html = html.split('aplus-tech.com.hk').join(workerHost);
-        // [Fix] 同時替換 Worker 預覽域名，防止舊連結殘留
-        html = html.split('cloudflare-9qe.pages.dev').join(workerHost);
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
@@ -114,8 +100,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             headers: { 'Content-Type': 'text/html; charset=UTF-8', 'X-Cache': 'MISS' }
         });
 
-    } catch (e: any) {
+    } catch (e) {
         console.error('Proxy Error:', e);
-        return new Response(`Internal Proxy Error: ${e.message}`, { status: 500 });
+        return resolve(event);
     }
 };
