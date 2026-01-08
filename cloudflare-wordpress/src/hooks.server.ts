@@ -6,7 +6,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
     const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
 
-    // 1. 強制跳轉返正式域名 (防止 pages.dev 洩漏)
+    // 1. 強制跳轉返正式域名
     if (url.hostname.includes(PAGES_DEV)) {
         return new Response(null, {
             status: 301,
@@ -23,19 +23,23 @@ export const handle: Handle = async ({ event, resolve }) => {
     const cookies = event.request.headers.get('cookie') || '';
     const isLoggedIn = cookies.includes('wordpress_logged_in_');
 
-    // 4. KV Cache 邏輯 (只限 GET 且未登入)
+    // 4. KV Cache 邏輯
     // @ts-ignore
     const kv = event.platform?.env?.HTML_CACHE;
-    const isNoCache = event.request.headers.get('cache-control')?.includes('no-cache');
+    const isNoCache = event.request.headers.get('cache-control')?.includes('no-cache') || url.searchParams.has('purge');
+
+    // 【修正】Cache Key 唔好再 Normalize 斜槓，WordPress 對呢個好敏感
+    const cacheKey = `html:${url.pathname}${url.search}`;
 
     if (kv && event.request.method === 'GET' && !isLoggedIn && !isNoCache) {
         try {
-            const normalizedPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
-            const cacheKey = `html:${normalizedPath}${url.search}`;
             const cachedHTML = await kv.get(cacheKey);
             if (cachedHTML) {
                 return new Response(cachedHTML, {
-                    headers: { 'Content-Type': 'text/html; charset=UTF-8', 'X-Edge-Cache': 'Hit' }
+                    headers: {
+                        'Content-Type': 'text/html; charset=UTF-8',
+                        'X-Edge-Cache': 'Hit'
+                    }
                 });
             }
         } catch (e) { }
@@ -64,7 +68,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                 redirect: 'manual'
             });
 
-            // 【關鍵】處理所有資源的跳轉 (包括圖片、CSS)
+            // 處理跳轉
             if (originResponse.status === 301 || originResponse.status === 302) {
                 const location = originResponse.headers.get('location');
                 if (location) {
@@ -81,7 +85,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 
             const contentType = originResponse.headers.get('content-type') || '';
 
-            // 針對 HTML, CSS, JS 進行強力網址替換
             if (contentType.includes('text/html') || contentType.includes('css') || contentType.includes('javascript') || contentType.includes('json')) {
                 let body = await originResponse.text();
 
@@ -92,7 +95,6 @@ export const handle: Handle = async ({ event, resolve }) => {
                     [`https://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
                     ['origin.aplus-tech.com.hk', CUSTOM_DOMAIN],
                     [PAGES_DEV, CUSTOM_DOMAIN],
-                    // 處理 JSON 轉義網址
                     ['http:\\/\\/origin.aplus-tech.com.hk', `https:\\/\\/${CUSTOM_DOMAIN}`],
                     [`http:\\/\\/${CUSTOM_DOMAIN}`, `https:\\/\\/${CUSTOM_DOMAIN}`],
                     [`http:\\/\\/www.${CUSTOM_DOMAIN}`, `https:\\/\\/${CUSTOM_DOMAIN}`]
@@ -107,19 +109,16 @@ export const handle: Handle = async ({ event, resolve }) => {
                 newHeaders.delete('content-length');
                 newHeaders.set('X-Edge-Cache', 'Miss');
 
-                const finalResponse = new Response(body, { status: originResponse.status, headers: newHeaders });
+                const finalResponse = new Response(body, { status: 200, headers: newHeaders });
 
-                // 存入 KV (只限 HTML)
-                if (kv && contentType.includes('text/html') && originResponse.status === 200 && !isLoggedIn) {
-                    const normalizedPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
-                    const cacheKey = `html:${normalizedPath}${url.search}`;
+                // 存入 KV (只限 HTML 且長度足夠，避免 Cache 錯誤頁面)
+                if (kv && contentType.includes('text/html') && originResponse.status === 200 && !isLoggedIn && body.length > 5000) {
                     event.platform.context.waitUntil(kv.put(cacheKey, body, { expirationTtl: 604800 }));
                 }
 
                 return finalResponse;
             }
 
-            // 圖片或其他資源
             return new Response(originResponse.body, {
                 status: originResponse.status,
                 headers: originResponse.headers

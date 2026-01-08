@@ -3,9 +3,9 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ platform, url }) => {
     const secret = url.searchParams.get('secret');
-    const SYNC_SECRET = 'Lui@63006021';
+    const expectedSecret = platform?.env.SYNC_SECRET_KEY || 'Lui@63006021';
 
-    if (secret !== SYNC_SECRET) {
+    if (secret !== expectedSecret) {
         return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -16,18 +16,23 @@ export const GET: RequestHandler = async ({ platform, url }) => {
     }
 
     try {
-        // 列出所有 Key
-        const list = await kv.list();
-        const keys = list.keys.map((k: { name: string }) => k.name);
+        let deletedCount = 0;
+        let list = await kv.list();
 
-        // 批量刪除
-        const deletePromises = keys.map((key: string) => kv.delete(key));
-        await Promise.all(deletePromises);
+        while (list.keys.length > 0) {
+            const keys = list.keys.map((k: { name: string }) => k.name);
+            const deletePromises = keys.map((key: string) => kv.delete(key));
+            await Promise.all(deletePromises);
+            deletedCount += keys.length;
+
+            if (list.list_complete) break;
+            list = await kv.list({ cursor: list.cursor });
+        }
 
         return json({
             success: true,
-            message: `Successfully deleted ${keys.length} items.`,
-            deleted_keys: keys
+            message: `Successfully deleted ${deletedCount} items from cache.`,
+            status: 'Cache Cleared'
         });
     } catch (e: any) {
         return json({ error: e.message }, { status: 500 });
