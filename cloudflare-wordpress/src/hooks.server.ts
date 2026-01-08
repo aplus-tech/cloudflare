@@ -31,7 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     // Proxy 核心邏輯
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 3) return new Response('Too many internal redirects', { status: 500 });
+        if (depth > 5) return new Response('Too many internal redirects - Please check cPanel Force HTTPS setting', { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -39,7 +39,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        proxyHeaders.set('Host', CUSTOM_DOMAIN);
+        // 【關鍵修正】使用 origin 作為 Host，確保 cPanel 認得
+        proxyHeaders.set('Host', 'origin.aplus-tech.com.hk');
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('HTTPS', 'on');
@@ -51,16 +52,20 @@ export const handle: Handle = async ({ event, resolve }) => {
             redirect: 'manual'
         });
 
-        // 如果 Origin 叫我哋跳轉去主域名，我哋直接喺內部再 Fetch 一次，唔好叫瀏覽器跳
+        // 處理跳轉
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
+                // 如果跳轉去 cPanel 預設頁面，即係 Host 仲係有問題
+                if (location.includes('defaultwebpage.cgi')) {
+                    return new Response('Origin Server redirected to cPanel default page. Please check Domain Alias settings.', { status: 500 });
+                }
+
                 const locUrl = new URL(location);
-                // 如果跳轉目標係同一個站，就內部跟隨
                 if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
                 }
-                // 否則，重寫 Location 後回傳給瀏覽器
+
                 const newLocation = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
             }
