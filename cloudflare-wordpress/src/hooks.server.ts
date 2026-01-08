@@ -23,27 +23,21 @@ export const handle: Handle = async ({ event, resolve }) => {
     const cookies = event.request.headers.get('cookie') || '';
     const isLoggedIn = cookies.includes('wordpress_logged_in_');
 
-    // 4. KV Cache 邏輯
-    // @ts-ignore
+    // 4. KV Cache 邏輯 (暫時停用，解決毒化問題)
+    /*
     const kv = event.platform?.env?.HTML_CACHE;
-    const isNoCache = event.request.headers.get('cache-control')?.includes('no-cache') || url.searchParams.has('purge');
-
-    // 【修正】Cache Key 唔好再 Normalize 斜槓，WordPress 對呢個好敏感
-    const cacheKey = `html:${url.pathname}${url.search}`;
-
-    if (kv && event.request.method === 'GET' && !isLoggedIn && !isNoCache) {
+    if (kv && event.request.method === 'GET' && !isLoggedIn) {
         try {
+            const cacheKey = `html:${url.pathname}${url.search}`;
             const cachedHTML = await kv.get(cacheKey);
             if (cachedHTML) {
                 return new Response(cachedHTML, {
-                    headers: {
-                        'Content-Type': 'text/html; charset=UTF-8',
-                        'X-Edge-Cache': 'Hit'
-                    }
+                    headers: { 'Content-Type': 'text/html; charset=UTF-8', 'X-Edge-Cache': 'Hit' }
                 });
             }
         } catch (e) { }
     }
+    */
 
     // 5. Proxy 邏輯
     let response = await resolve(event);
@@ -107,16 +101,9 @@ export const handle: Handle = async ({ event, resolve }) => {
                 const newHeaders = new Headers(originResponse.headers);
                 newHeaders.delete('content-encoding');
                 newHeaders.delete('content-length');
-                newHeaders.set('X-Edge-Cache', 'Miss');
+                newHeaders.set('X-Edge-Cache', 'Disabled');
 
-                const finalResponse = new Response(body, { status: 200, headers: newHeaders });
-
-                // 存入 KV (只限 HTML 且長度足夠，避免 Cache 錯誤頁面)
-                if (kv && contentType.includes('text/html') && originResponse.status === 200 && !isLoggedIn && body.length > 5000) {
-                    event.platform.context.waitUntil(kv.put(cacheKey, body, { expirationTtl: 604800 }));
-                }
-
-                return finalResponse;
+                return new Response(body, { status: 200, headers: newHeaders });
             }
 
             return new Response(originResponse.body, {
