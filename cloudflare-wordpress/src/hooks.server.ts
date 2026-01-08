@@ -5,8 +5,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
-    // 【終極修正】改回 HTTPS，但配合 Host Header 繞過 cPanel 跳轉
-    const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
+    // 【終極繞過】使用 HTTP 連線，配合「彈性 (Flexible)」模式
+    const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
 
     // 1. 強制跳轉返正式域名
     if (url.hostname.includes(PAGES_DEV)) {
@@ -51,9 +51,12 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
+        // 【關鍵】偽裝成 HTTPS，防止 cPanel 強制跳轉
         proxyHeaders.set('Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
+        proxyHeaders.set('X-Forwarded-Port', '443');
+        proxyHeaders.set('HTTPS', 'on');
 
         try {
             const originResponse = await fetch(`${ORIGIN_URL}${url.pathname}${url.search}`, {
