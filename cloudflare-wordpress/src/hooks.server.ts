@@ -14,16 +14,16 @@ export const handle: Handle = async ({ event, resolve }) => {
         });
     }
 
-    // 2. 排除特定路徑 (API, Admin)
+    // 2. 排除特定路徑
     if (url.pathname.startsWith('/api') || url.pathname.startsWith('/admin')) {
         return resolve(event);
     }
 
-    // 3. 檢查登入 (登入咗就唔行 Cache)
+    // 3. 檢查登入
     const cookies = event.request.headers.get('cookie') || '';
     const isLoggedIn = cookies.includes('wordpress_logged_in_');
 
-    // 4. 嘗試從 KV 讀取 (只限 GET 且未登入嘅 HTML)
+    // 4. KV Cache
     // @ts-ignore
     const kv = event.platform?.env?.HTML_CACHE;
     if (kv && event.request.method === 'GET' && !isLoggedIn) {
@@ -41,8 +41,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     // 5. Proxy 邏輯
     const proxyHeaders = new Headers();
-    const headersToCopy = ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type'];
-    headersToCopy.forEach(h => {
+    ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type'].forEach(h => {
         const val = event.request.headers.get(h);
         if (val) proxyHeaders.set(h, val);
     });
@@ -66,6 +65,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (location) {
                 const newLocation = location
                     .replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`)
+                    .replace(`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`)
                     .replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN)
                     .replace(PAGES_DEV, CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
@@ -74,24 +74,30 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         const contentType = originResponse.headers.get('content-type') || '';
 
-        // 針對 HTML, CSS, JS 進行網址替換
         if (contentType.includes('text/html') || contentType.includes('text/css') || contentType.includes('application/javascript')) {
             let body = await originResponse.text();
 
-            // 全域替換所有可能出錯嘅域名
-            body = body.split(ORIGIN_URL).join(`https://${CUSTOM_DOMAIN}`);
-            body = body.split('http://origin.aplus-tech.com.hk').join(`https://${CUSTOM_DOMAIN}`);
-            body = body.split('origin.aplus-tech.com.hk').join(CUSTOM_DOMAIN);
-            body = body.split(PAGES_DEV).join(CUSTOM_DOMAIN);
+            // 【超級強力替換】確保所有 HTTP 連結都變做 HTTPS
+            const replacements = [
+                [ORIGIN_URL, `https://${CUSTOM_DOMAIN}`],
+                [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`], // 解決 Mixed Content 關鍵！
+                ['origin.aplus-tech.com.hk', CUSTOM_DOMAIN],
+                [PAGES_DEV, CUSTOM_DOMAIN],
+                ['http:\\/\\/origin.aplus-tech.com.hk', `https:\\/\\/${CUSTOM_DOMAIN}`],
+                [`http:\\/\\/${CUSTOM_DOMAIN}`, `https:\\/\\/${CUSTOM_DOMAIN}`]
+            ];
+
+            for (const [from, to] of replacements) {
+                body = body.split(from).join(to);
+            }
 
             const newHeaders = new Headers(originResponse.headers);
             newHeaders.delete('content-encoding');
             newHeaders.delete('content-length');
             newHeaders.set('X-Edge-Cache', 'Miss');
 
-            const finalResponse = new Response(body, { status: originResponse.status, headers: newHeaders });
+            const finalResponse = new Response(body, { status: 200, headers: newHeaders });
 
-            // 存入 KV (只限 HTML)
             if (kv && contentType.includes('text/html') && originResponse.status === 200 && !isLoggedIn) {
                 const normalizedPath = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
                 const cacheKey = `html:${normalizedPath}${url.search}`;
@@ -101,7 +107,6 @@ export const handle: Handle = async ({ event, resolve }) => {
             return finalResponse;
         }
 
-        // 圖片或其他資源直接回傳
         return new Response(originResponse.body, {
             status: originResponse.status,
             headers: originResponse.headers
