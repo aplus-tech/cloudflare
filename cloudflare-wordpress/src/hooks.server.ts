@@ -5,8 +5,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
-    // 【終極穩定版】直接使用 IP 連線，避開所有 DNS 同 SSL 526 問題
-    const ORIGIN_IP = 'http://74.117.152.12';
+    // 【最終方案】使用 DNS Only 的 origin 域名，走 HTTP 避開 1003 同 526
+    const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
 
     if (url.pathname.startsWith('/api')) return resolve(event);
 
@@ -32,7 +32,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 5) return new Response('Too many internal redirects. Please ensure "Force HTTPS Redirect" is OFF in cPanel.', { status: 500 });
+        if (depth > 5) return new Response('Too many internal redirects. Please ensure cPanel Force HTTPS is OFF.', { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -40,13 +40,13 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        // 必須傳送主域名作為 Host，cPanel 先至認得
+        // 傳送主域名作為 Host，讓 WordPress 認得
         proxyHeaders.set('Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('HTTPS', 'on');
 
-        const originResponse = await fetch(`${ORIGIN_IP}${targetPath}${targetSearch}`, {
+        const originResponse = await fetch(`${ORIGIN_URL}${targetPath}${targetSearch}`, {
             method: event.request.method,
             headers: proxyHeaders,
             body: event.request.method !== 'GET' && event.request.method !== 'HEAD' ? await event.request.arrayBuffer() : null,
@@ -56,17 +56,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
-                // 如果 Origin 仲係想跳去 defaultwebpage，代表 Host Header 仲係有問題或者 Server 仲係想強制 HTTPS
-                if (location.includes('defaultwebpage.cgi')) {
-                    return new Response('Origin redirected to default page. Please ensure cPanel Alias and Force HTTPS settings are correct.', { status: 500 });
-                }
-
                 const locUrl = new URL(location);
-                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk' || locUrl.hostname === '74.117.152.12') {
+                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
                 }
-
-                const newLocation = location.replace(ORIGIN_IP, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
+                const newLocation = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
             }
         }
@@ -80,10 +74,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         if (contentType.includes('text/html') || contentType.includes('css') || contentType.includes('javascript') || contentType.includes('json')) {
             let body = await originResponse.text();
-
-            // 替換所有可能的 Origin 網址
             const replacements = [
-                [ORIGIN_IP, `https://${CUSTOM_DOMAIN}`],
+                [ORIGIN_URL, `https://${CUSTOM_DOMAIN}`],
                 ['http://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 ['https://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
