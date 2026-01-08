@@ -5,8 +5,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
-    // 【修正】使用 HTTPS 連線，配合 wp-config.php 的修正
-    const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
+    // 【完美修正】使用 HTTP 連線避開 526 錯誤
+    // 依賴 wp-config.php 的修正來防止跳轉死循環
+    const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
 
     // 1. API 路由直接交給 SvelteKit
     if (url.pathname.startsWith('/api')) {
@@ -29,7 +30,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         url.pathname.startsWith('/wp-admin') ||
         url.pathname.startsWith('/wp-login.php');
 
-    // 4. KV Cache (暫時開啟，如果還有問題可隨時關閉)
+    // 4. KV Cache
     // @ts-ignore
     const kv = event.platform?.env?.HTML_CACHE;
     const isNoCache = event.request.headers.get('cache-control')?.includes('no-cache') || url.searchParams.has('purge');
@@ -87,7 +88,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
             const replacements = [
                 [ORIGIN_URL, `https://${CUSTOM_DOMAIN}`],
-                ['http://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`], // 舊的 HTTP origin
+                ['http://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
                 [`http://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
                 [`https://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
