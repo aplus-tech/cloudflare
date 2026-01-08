@@ -1,20 +1,15 @@
 <?php
 /**
  * Plugin Name: A Plus D1 Data Sync
- * Description: Sync WordPress products to Cloudflare D1 with HTTPS Fix.
+ * Description: Sync WordPress products to Cloudflare D1.
  */
 
 if (!defined('ABSPATH'))
     exit;
 
-// 【關鍵修復】解決 Cloudflare Flexible SSL 導致的重新導向次數過多問題
-if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
-    $_SERVER['HTTPS'] = 'on';
-}
-
 class APlus_D1_Sync
 {
-    private $sync_url = 'https://aplus-tech.com.hk/api/sync';
+    private $sync_url = 'https://cloudflare-9qe.pages.dev/api/sync';
     private $secret_key = 'Lui@63006021';
 
     public function __construct()
