@@ -4,7 +4,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
-    const ORIGIN_URL = 'http://origin.aplus-tech.com.hk';
+    
+    // 【終極解決方案】使用已經攞到綠色鎖頭嘅 HTTPS origin
+    const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
 
     if (url.pathname.startsWith('/api')) return resolve(event);
 
@@ -30,7 +32,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 10) return new Response(`Too many internal redirects. Last Path: ${targetPath}`, { status: 500 });
+        if (depth > 5) return new Response('Too many internal redirects', { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -38,19 +40,10 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        // 【終極欺騙 Header】
         proxyHeaders.set('Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
-        proxyHeaders.set('X-Forwarded-Port', '443');
-        proxyHeaders.set('X-Forwarded-Ssl', 'on');
         proxyHeaders.set('HTTPS', 'on');
-        proxyHeaders.set('CF-Visitor', '{"scheme":"https"}'); // 模擬 Cloudflare 訪客
-
-        // Bypass LiteSpeed 或其他伺服器快取
-        proxyHeaders.set('Cache-Control', 'no-cache');
-        proxyHeaders.set('Pragma', 'no-cache');
-        proxyHeaders.set('X-LSCACHE', 'off');
 
         const originResponse = await fetch(`${ORIGIN_URL}${targetPath}${targetSearch}`, {
             method: event.request.method,
@@ -62,16 +55,10 @@ export const handle: Handle = async ({ event, resolve }) => {
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
-                // 如果跳轉去同一個 URL，代表死循環
-                if (location === `https://${CUSTOM_DOMAIN}${targetPath}${targetSearch}` || location === `http://${CUSTOM_DOMAIN}${targetPath}${targetSearch}`) {
-                    return new Response(`Origin Loop Detected: Server is forcing redirect to ${location} even with HTTPS headers. Please check wp-config.php fix.`, { status: 500 });
-                }
-
                 const locUrl = new URL(location, `https://${CUSTOM_DOMAIN}`);
-                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk' || locUrl.hostname === 'www.aplus-tech.com.hk') {
+                if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
                 }
-
                 const newLocation = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
             }
@@ -91,7 +78,6 @@ export const handle: Handle = async ({ event, resolve }) => {
                 ['http://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 ['https://origin.aplus-tech.com.hk', `https://${CUSTOM_DOMAIN}`],
                 [`http://${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
-                [`http://www.${CUSTOM_DOMAIN}`, `https://${CUSTOM_DOMAIN}`],
                 ['origin.aplus-tech.com.hk', CUSTOM_DOMAIN],
                 [PAGES_DEV, CUSTOM_DOMAIN]
             ];
