@@ -1,15 +1,20 @@
 <?php
 /**
  * Plugin Name: A Plus D1 Data Sync
- * Description: Sync WordPress products to Cloudflare D1 with Auto-Brand Detection.
+ * Description: Sync WordPress products to Cloudflare D1 with HTTPS Fix.
  */
 
 if (!defined('ABSPATH'))
     exit;
 
+// 【關鍵修復】解決 Cloudflare Flexible SSL 導致的重新導向次數過多問題
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+
 class APlus_D1_Sync
 {
-    private $sync_url = 'https://cloudflare-9qe.pages.dev/api/sync';
+    private $sync_url = 'https://aplus-tech.com.hk/api/sync';
     private $secret_key = 'Lui@63006021';
 
     public function __construct()
@@ -33,10 +38,8 @@ class APlus_D1_Sync
         if (!$product)
             return;
 
-        // 自動偵測品牌 Taxonomy
         $brand_name = '';
         $possible_taxonomies = array('product_brand', 'pa_brand', 'pwb-brand', 'brand');
-
         foreach ($possible_taxonomies as $tax) {
             $brands = $this->get_safe_term_names($post_id, $tax);
             if (!empty($brands)) {
@@ -79,7 +82,7 @@ class APlus_D1_Sync
             'method' => 'POST',
             'headers' => array('Content-Type' => 'application/json'),
             'body' => json_encode($body),
-            'blocking' => false, // 恢復非阻塞模式，提升後台速度
+            'blocking' => false,
             'timeout' => 5,
             'sslverify' => false
         ));
