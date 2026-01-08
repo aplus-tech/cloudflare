@@ -5,7 +5,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
 
-    // 【終極方案】使用已經攞到綠色鎖頭嘅 HTTPS origin
+    // 使用已經攞到綠色鎖頭嘅 HTTPS origin
     const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
 
     if (url.pathname.startsWith('/api')) return resolve(event);
@@ -31,8 +31,13 @@ export const handle: Handle = async ({ event, resolve }) => {
         } catch (e) { }
     }
 
-    async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 5) return new Response(`Too many internal redirects. Last Path: ${targetPath}`, { status: 500 });
+    // 加入 history 參數來精確偵測死循環
+    async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0, history: string[] = []): Promise<Response> {
+        const currentPath = `${targetPath}${targetSearch}`;
+        if (history.includes(currentPath)) {
+            return new Response(`Redirect Loop Detected at Origin! Path: ${currentPath}`, { status: 500 });
+        }
+        if (depth > 10) return new Response('Too many internal redirects', { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -40,8 +45,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        // 【嘗試】改用 origin 作為 Host，避開 cPanel 的 Host 檢查
-        proxyHeaders.set('Host', 'origin.aplus-tech.com.hk');
+        // 【關鍵】必須傳送主域名作為 Host，配合 HTTPS 連線，cPanel 才會正確導向
+        proxyHeaders.set('Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
         proxyHeaders.set('X-Forwarded-Port', '443');
@@ -57,14 +62,10 @@ export const handle: Handle = async ({ event, resolve }) => {
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
-                // 如果跳轉去同一個 Path，即係死循環
-                if (location.includes(targetPath) && depth > 0) {
-                    return new Response(`Redirect Loop Detected! Target: ${location}`, { status: 500 });
-                }
-
                 const locUrl = new URL(location, `https://${CUSTOM_DOMAIN}`);
+                // 如果跳轉目標是同一個站，則在內部跟隨
                 if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
-                    return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
+                    return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1, [...history, currentPath]);
                 }
                 const newLocation = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
                 return new Response(null, { status: originResponse.status, headers: { 'Location': newLocation } });
