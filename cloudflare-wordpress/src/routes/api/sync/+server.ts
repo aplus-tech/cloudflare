@@ -12,9 +12,15 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
     try {
         const encodedUrl = new URL(url).href;
 
-        // 1. 檢查是否已經同步過 (恢復檢查，避免重複上傳)
+        // 1. 檢查是否已經同步過，並驗證 R2 檔案是否真的存在
         const existing = await db.prepare('SELECT r2_path FROM media_mapping WHERE original_url = ?').bind(url).first();
-        if (existing) return existing.r2_path;
+        if (existing) {
+            // 檢查 R2 中是否真的有這個檔案
+            const r2File = await r2.head(existing.r2_path);
+            if (r2File) {
+                return existing.r2_path;
+            }
+        }
 
         const rawFilename = url.split('/').pop()?.split('?')[0] || 'image.jpg';
         const filename = decodeURIComponent(rawFilename);
