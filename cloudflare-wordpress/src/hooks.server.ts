@@ -5,23 +5,17 @@ export const handle: Handle = async ({ event, resolve }) => {
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
 
-    // 1. API 唔好郁佢
     if (url.pathname.startsWith('/api')) return resolve(event);
 
-    // 2. 準備 Headers (最基本轉發)
-    const proxyHeaders = new Headers();
-    ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
-        const val = event.request.headers.get(h);
-        if (val) proxyHeaders.set(h, val);
-    });
-
-    // 話俾 WordPress 聽我哋係 HTTPS
+    // 準備最基本的 Headers
+    const proxyHeaders = new Headers(event.request.headers);
     proxyHeaders.set('Host', CUSTOM_DOMAIN);
+    proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
     proxyHeaders.set('X-Forwarded-Proto', 'https');
     proxyHeaders.set('HTTPS', 'on');
 
     try {
-        // 3. 直接 Fetch (redirect: manual，唔好自己跳)
+        // 直接 Fetch，唔好做內部跳轉跟隨，交返俾瀏覽器
         const response = await fetch(`${ORIGIN_URL}${url.pathname}${url.search}`, {
             method: event.request.method,
             headers: proxyHeaders,
@@ -29,17 +23,16 @@ export const handle: Handle = async ({ event, resolve }) => {
             redirect: 'manual'
         });
 
-        // 4. 處理跳轉 (淨係換個網址)
+        // 如果 Origin 叫我哋跳轉，我哋只係改個網址名
         if (response.status >= 300 && response.status < 400) {
             let location = response.headers.get('location') || '';
             location = location.replace(ORIGIN_URL, `https://${CUSTOM_DOMAIN}`).replace('origin.aplus-tech.com.hk', CUSTOM_DOMAIN);
-            return new Response(null, {
-                status: response.status,
-                headers: { 'Location': location }
-            });
+            const newHeaders = new Headers(response.headers);
+            newHeaders.set('Location', location);
+            return new Response(null, { status: response.status, headers: newHeaders });
         }
 
-        // 5. 處理內容替換 (HTML/CSS/JS)
+        // 內容替換 (HTML/CSS/JS)
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('text/html') || contentType.includes('css') || contentType.includes('javascript')) {
             let body = await response.text();
