@@ -4,8 +4,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     const url = new URL(event.url);
     const CUSTOM_DOMAIN = 'aplus-tech.com.hk';
     const PAGES_DEV = 'cloudflare-9qe.pages.dev';
-    
-    // 【終極解決方案】使用已經攞到綠色鎖頭嘅 HTTPS origin
+
+    // 【終極方案】使用已經攞到綠色鎖頭嘅 HTTPS origin
     const ORIGIN_URL = 'https://origin.aplus-tech.com.hk';
 
     if (url.pathname.startsWith('/api')) return resolve(event);
@@ -32,7 +32,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     async function fetchFromOrigin(targetPath: string, targetSearch: string, depth = 0): Promise<Response> {
-        if (depth > 5) return new Response('Too many internal redirects', { status: 500 });
+        if (depth > 5) return new Response(`Too many internal redirects. Last Path: ${targetPath}`, { status: 500 });
 
         const proxyHeaders = new Headers();
         ['accept', 'accept-language', 'cookie', 'user-agent', 'content-type', 'referer'].forEach(h => {
@@ -40,9 +40,11 @@ export const handle: Handle = async ({ event, resolve }) => {
             if (val) proxyHeaders.set(h, val);
         });
 
-        proxyHeaders.set('Host', CUSTOM_DOMAIN);
+        // 【嘗試】改用 origin 作為 Host，避開 cPanel 的 Host 檢查
+        proxyHeaders.set('Host', 'origin.aplus-tech.com.hk');
         proxyHeaders.set('X-Forwarded-Host', CUSTOM_DOMAIN);
         proxyHeaders.set('X-Forwarded-Proto', 'https');
+        proxyHeaders.set('X-Forwarded-Port', '443');
         proxyHeaders.set('HTTPS', 'on');
 
         const originResponse = await fetch(`${ORIGIN_URL}${targetPath}${targetSearch}`, {
@@ -55,6 +57,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         if (originResponse.status === 301 || originResponse.status === 302) {
             const location = originResponse.headers.get('location');
             if (location) {
+                // 如果跳轉去同一個 Path，即係死循環
+                if (location.includes(targetPath) && depth > 0) {
+                    return new Response(`Redirect Loop Detected! Target: ${location}`, { status: 500 });
+                }
+
                 const locUrl = new URL(location, `https://${CUSTOM_DOMAIN}`);
                 if (locUrl.hostname === CUSTOM_DOMAIN || locUrl.hostname === 'origin.aplus-tech.com.hk') {
                     return fetchFromOrigin(locUrl.pathname, locUrl.search, depth + 1);
