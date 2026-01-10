@@ -1,0 +1,43 @@
+# 專案基本資料
+project:
+  name: "Cloudflare WordPress Accelerator"
+  type: "Fullstack"
+  language: "TypeScript + PHP"
+  framework: "SvelteKit + WordPress"
+  database: "Cloudflare D1 + MySQL"
+
+# AI 模型設定
+ai:
+  primary_model: "claude-sonnet-4"      # 日常開發用
+  architect_model: "claude-opus-4"      # 架構設計用
+  language: "cantonese"                 # 廣東話
+
+  rules_files:
+    - ".ai/CLAUDE.md"                   # Sonnet 規則
+    - ".ai/CLAUDE_OPUS.md"              # Opus 規則
+
+# 文檔優先順序（AI 會按呢個次序讀）
+priority_docs:
+  - ".ai/CLAUDE.md"                     # 最高優先
+  - ".ai/context.yaml"
+  - "README.md"
+  - "task.md"
+  - "implementation_plan.md"
+  - "architecture_design.md"
+  - "docs/ARCHITECTURE.md"
+  - "docs/API_SPEC.md"
+
+# 代碼風格
+code_style:
+  indent: "2 spaces"                    # SvelteKit 用 2 spaces
+  naming: "camelCase"                   # TypeScript 用 camelCase
+  max_line_length: 100
+  comment_language: "cantonese"         # 註解用廣東話
+
+# 重要變數
+variables:
+  vps_ip: "15.235.199.194"
+  origin_domain: "origin.aplus-tech.com.hk"
+  main_domain: "aplus-tech.com.hk"
+  media_domain: "media.aplus-tech.com.hk"
+  cloudflare_pages: "cloudflare-9qe.pages.dev"
