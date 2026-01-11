@@ -7,8 +7,8 @@
 ## 📊 進度總覽
 
 - ✅ **已完成**：Phase 0-4.6（基礎設施、緩存、同步、R2 遷移）
-- ⚠️ **進行中**：Phase 4.7（修復安全和性能問題）
-- 🚧 **待開始**：Phase 5-6（Invoice/Quote 系統、AI SEO 系統）
+- ⚠️ **進行中**：Phase 4.8（VPS 全面測試 - 準備生產遷移）
+- 🚧 **待開始**：Phase 4.7（修復安全和性能問題）、Phase 5-6（Invoice/Quote 系統、AI SEO 系統）
 
 ---
 
@@ -67,24 +67,25 @@
 
 ### 前置步驟：DNS 與 WordPress 設定
 
-#### 4.8.0：Cloudflare DNS 與 WordPress 設定（必須先完成）
+#### 4.8.0：Cloudflare DNS 與 WordPress 設定（已完成 ✅）
 
 **步驟 1：Cloudflare DNS 設定**
-- [ ] 登入 Cloudflare Dashboard
-- [ ] 去 DNS 管理頁面
-- [ ] 加入新 A Record：
+- [x] 登入 Cloudflare Dashboard
+- [x] 去 DNS 管理頁面
+- [x] 加入新 A Record：
   - Type: `A`
   - Name: `test`
   - Content: `15.235.199.194`
   - Proxy status: **Proxied（Orange Cloud）**
   - TTL: Auto
-- [ ] 儲存設定
+- [x] 儲存設定
 
 **步驟 2：等待 DNS 生效**
-- [ ] 等待 1-5 分鐘
-- [ ] 測試 DNS 解析：`nslookup test.aplus-tech.com.hk`
+- [x] DNS 已生效
+- [x] 測試 DNS 解析：`nslookup test.aplus-tech.com.hk`
 
 **步驟 3：更新 VPS WordPress Site URL**
+- [x] 已更新為 https://test.aplus-tech.com.hk
 
 使用 **WP-CLI**（推薦）：
 ```bash
@@ -117,9 +118,13 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 ```
 
 **步驟 4：驗證設定**
-- [ ] 訪問 `https://test.aplus-tech.com.hk`
-- [ ] 確認可以正常顯示
-- [ ] 檢查 SSL 證書有效（Cloudflare 自動提供）
+- [x] 訪問 `https://test.aplus-tech.com.hk`
+- [x] 確認可以正常顯示
+- [x] 檢查 SSL 證書有效（Cloudflare 自動提供）
+
+**步驟 5：WordPress Plugin 設定**
+- [x] 上傳 Plugin v2.0 到 VPS
+- [x] Activate Plugin
 
 ---
 

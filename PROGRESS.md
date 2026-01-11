@@ -14,9 +14,11 @@
 - 完成後：將域名 aplus-tech.com.hk 遷移到 VPS
 
 **前置步驟（必須先完成）**：
-- [ ] Cloudflare DNS 加入 test.aplus-tech.com.hk → 15.235.199.194
-- [ ] 更新 VPS WordPress Site URL 為 https://test.aplus-tech.com.hk
-- [ ] 驗證 DNS 解析同 SSL 證書
+- [x] Cloudflare DNS 加入 test.aplus-tech.com.hk → 15.235.199.194
+- [x] 更新 VPS WordPress Site URL 為 https://test.aplus-tech.com.hk
+- [x] 驗證 DNS 解析同 SSL 證書
+- [x] 上傳 WordPress Plugin v2.0 到 VPS
+- [x] Activate Plugin
 
 **測試清單**：
 - [x] R2 圖片上傳同步測試

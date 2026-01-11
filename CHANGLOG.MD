@@ -44,6 +44,47 @@
 - 修復位置：cloudflare-wordpress/src/routes/api/sync/+server.ts:8-12
 - Git Commit: 30950d1
 
+### 修改 Changed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| - | 更新 WordPress Plugin 到 Version 2.0 | Wordpress Plugin/wp-d1-sync.php |
+
+**【問題原因】**
+- 舊版 Plugin (v1.0) 功能唔齊全
+- API URL 指向錯誤（aplus-tech.com.hk）
+- 冇 R2 圖片同步功能
+
+**【方案成立】**
+- 使用 backup_phase_4_5_stable 版本 (v2.0)
+- API URL 指向正確（cloudflare-9qe.pages.dev）
+- 包含完整功能（R2、Brand、SEO）
+
+**【來源證據】**
+- 來源檔案：backup_phase_4_5_stable/wp-d1-sync.php
+- 目標檔案：Wordpress Plugin/wp-d1-sync.php
+- Git Commit: 03b420d
+
+### 新增 Added
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| - | Cloudflare DNS 加入 test.aplus-tech.com.hk → 15.235.199.194 | Cloudflare Dashboard |
+| - | VPS WordPress Site URL 更新為 https://test.aplus-tech.com.hk | VPS WordPress |
+
+**【問題原因】**
+- 需要獨立測試環境
+- 測試 DNS、SSL、CDN 功能
+- 唔影響生產環境（aplus-tech.com.hk）
+
+**【方案成立】**
+- Cloudflare DNS A Record (Proxied)
+- 自動提供 SSL 證書
+- 完整測試環境就緒
+
+**【來源證據】**
+- DNS Record: test.aplus-tech.com.hk
+- VPS IP: 15.235.199.194
+- 測試 URL: https://test.aplus-tech.com.hk
+
 ---
 
 ## 2025-01-10
