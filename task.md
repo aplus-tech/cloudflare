@@ -65,6 +65,64 @@
 ### 目標
 確認 VPS (http://15.235.199.194/) 所有功能正常，準備將域名遷移
 
+### 前置步驟：DNS 與 WordPress 設定
+
+#### 4.8.0：Cloudflare DNS 與 WordPress 設定（必須先完成）
+
+**步驟 1：Cloudflare DNS 設定**
+- [ ] 登入 Cloudflare Dashboard
+- [ ] 去 DNS 管理頁面
+- [ ] 加入新 A Record：
+  - Type: `A`
+  - Name: `test`
+  - Content: `15.235.199.194`
+  - Proxy status: **Proxied（Orange Cloud）**
+  - TTL: Auto
+- [ ] 儲存設定
+
+**步驟 2：等待 DNS 生效**
+- [ ] 等待 1-5 分鐘
+- [ ] 測試 DNS 解析：`nslookup test.aplus-tech.com.hk`
+
+**步驟 3：更新 VPS WordPress Site URL**
+
+使用 **WP-CLI**（推薦）：
+```bash
+# SSH 登入 VPS
+ssh user@15.235.199.194
+
+# 更新 Site URL 同 Home URL
+wp option update siteurl 'https://test.aplus-tech.com.hk' --allow-root
+wp option update home 'https://test.aplus-tech.com.hk' --allow-root
+
+# 驗證設定
+wp option get siteurl --allow-root
+wp option get home --allow-root
+```
+
+或使用 **MySQL**：
+```sql
+-- 登入 MySQL
+mysql -u root -p
+
+-- 選擇 WordPress 資料庫
+USE wordpress;
+
+-- 更新 URL
+UPDATE wp_options SET option_value = 'https://test.aplus-tech.com.hk' WHERE option_name = 'siteurl';
+UPDATE wp_options SET option_value = 'https://test.aplus-tech.com.hk' WHERE option_name = 'home';
+
+-- 驗證
+SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
+```
+
+**步驟 4：驗證設定**
+- [ ] 訪問 `https://test.aplus-tech.com.hk`
+- [ ] 確認可以正常顯示
+- [ ] 檢查 SSL 證書有效（Cloudflare 自動提供）
+
+---
+
 ### 測試項目
 
 #### 4.8.1：R2 圖片功能測試

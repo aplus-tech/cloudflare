@@ -9,8 +9,14 @@
 ### 🎯 當前目標
 **Phase 4.8：VPS 全面測試（準備生產遷移）**
 - 測試環境：http://15.235.199.194/ (VPS)
+- 測試域名：test.aplus-tech.com.hk（待設定）
 - 目標：確認所有功能正常運作
 - 完成後：將域名 aplus-tech.com.hk 遷移到 VPS
+
+**前置步驟（必須先完成）**：
+- [ ] Cloudflare DNS 加入 test.aplus-tech.com.hk → 15.235.199.194
+- [ ] 更新 VPS WordPress Site URL 為 https://test.aplus-tech.com.hk
+- [ ] 驗證 DNS 解析同 SSL 證書
 
 **測試清單**：
 - [x] R2 圖片上傳同步測試
