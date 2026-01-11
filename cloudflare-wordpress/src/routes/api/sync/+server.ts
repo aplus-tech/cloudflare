@@ -44,9 +44,9 @@ async function syncImageToR2(url: string, type: string, brand: string, slug: str
         });
         if (!response.ok) return url;
 
-        const blob = await response.blob();
+        const imageBuffer = await response.arrayBuffer();
 
-        await r2.put(r2Path, blob, {
+        await r2.put(r2Path, imageBuffer, {
             httpMetadata: { contentType: response.headers.get('content-type') || 'image/jpeg' }
         });
 
