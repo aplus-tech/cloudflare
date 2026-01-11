@@ -2,9 +2,14 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 // 輔助函數：將圖片同步到 R2 並記錄到 D1
-// 輔助函數：將圖片同步到 R2 並記錄到 D1
 async function syncImageToR2(url: string, type: string, brand: string, slug: string, platform: any, object_id?: number, alt_text?: string) {
     if (!url || !url.startsWith('http')) return null; // Return null on invalid URL
+
+    // [Validation] 只接受 WordPress 原始 URL，拒絕 R2 URL
+    if (url.includes('media.aplus-tech.com.hk')) {
+        console.warn(`[Validation] Rejected R2 URL (not WordPress original): ${url}`);
+        return null;
+    }
 
     const db = platform.env.DB;
     const r2 = platform.env.MEDIA_BUCKET;
