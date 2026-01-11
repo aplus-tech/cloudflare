@@ -55,6 +55,8 @@
 - [x] WordPress 插件接收 R2 路徑
 - [x] 實現 `wp_get_attachment_url` filter
 - [x] 驗證圖片加載速度提升
+- [x] **Bug Fix (2026-01-11)**：修復 R2 圖片損壞（blob → arrayBuffer）
+- [x] **Bug Fix (2026-01-11)**：加入 URL Validation 防止錯誤 URL
 
 ---
 

@@ -4,6 +4,48 @@
 
 ---
 
+## 2026-01-11
+
+### 修復 Fixed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| - | 修復 R2 圖片損壞問題（Phase 4.6 Bug Fix） | api/sync/+server.ts:50 |
+| - | 加入 URL Validation 防止 R2 URL 誤存 | api/sync/+server.ts:8-12 |
+
+#### 修復 1：R2 圖片損壞
+
+**【問題原因】**
+- R2 顯示圖片大小正確（230.12 kB）但無法預覽
+- 下載圖片後無法用圖片檢視器開啟
+- WordPress 無法顯示產品圖片
+- 原因：Line 50 使用 `response.blob()` 導致二進制數據損壞
+
+**【方案成立】**
+- 改用 `response.arrayBuffer()` 保持圖片數據完整性
+- 基於 Cloudflare R2 文檔建議使用 ArrayBuffer 處理二進制數據
+
+**【來源證據】**
+- 修復位置：cloudflare-wordpress/src/routes/api/sync/+server.ts:50
+- Git Commit: e83c623
+- 測試環境：http://15.235.199.194/ (VPS)
+
+#### 修復 2：URL Validation
+
+**【問題原因】**
+- D1 `media_mapping` table 出現錯誤 row
+- `original_url` 儲存咗 R2 URL (`media.aplus-tech.com.hk`) 而唔係 WordPress 原始 URL
+
+**【方案成立】**
+- 喺 API 加入 validation，拒絕包含 `media.aplus-tech.com.hk` 嘅 URL
+- 只接受 WordPress 原始 URL (`/wp-content/uploads/`)
+- 防禦性編程：API 唔信任外部輸入
+
+**【來源證據】**
+- 修復位置：cloudflare-wordpress/src/routes/api/sync/+server.ts:8-12
+- Git Commit: 30950d1
+
+---
+
 ## 2025-01-10
 
 ### 新增 Added

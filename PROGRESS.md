@@ -43,6 +43,18 @@
 
 ## 里程碑記錄
 
+### 2026-01-11
+- ✅ **Phase 4.6 Bug Fix**：修復 R2 圖片損壞問題
+  - 問題：圖片上傳到 R2 後損壞無法預覽
+  - 修復：blob() → arrayBuffer()
+  - 位置：api/sync/+server.ts:50
+  - Commit: e83c623
+- ✅ **Phase 4.6 Bug Fix**：加入 URL Validation
+  - 問題：media_mapping 誤存 R2 URL
+  - 修復：API 拒絕非 WordPress URL
+  - 位置：api/sync/+server.ts:8-12
+  - Commit: 30950d1
+
 ### 2026-01-08
 - ✅ **Phase 4.6 上線**：混合架構成功部署
   - HTML 由 Origin（Shared Hosting）提供
