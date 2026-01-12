@@ -77,11 +77,15 @@ export const handle: Handle = async ({ event, resolve }) => {
         let html = await response.text();
 
         // 5. 內容替換 (域名與 R2 媒體)
-        // 只有當訪問 cloudflare-9qe.pages.dev 時，先替換域名為自訂網域
-        const workerHost = url.host;
-        if (workerHost !== 'test.aplus-tech.com.hk') {
-            html = html.split('test.aplus-tech.com.hk').join(workerHost);
-        }
+        // 將 WordPress 返回嘅 HTML 入面嘅 origin URL 替換成當前訪問嘅域名
+        const currentHost = url.host;
+        const targetHost = 'test.aplus-tech.com.hk'; // VPS WordPress 設定嘅域名
+
+        // 替換 WordPress 內部 URL 為當前訪問嘅域名
+        // 例如：將 http://15.235.199.194/xxx 替換成 https://test.aplus-tech.com.hk/xxx
+        html = html.split(`http://15.235.199.194`).join(`https://${currentHost}`);
+        html = html.split(`https://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
+        html = html.split(`http://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
