@@ -78,7 +78,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         // 5. 內容替換 (域名與 R2 媒體)
         const workerHost = url.host;
-        html = html.split('aplus-tech.com.hk').join(workerHost);
+        html = html.split('test.aplus-tech.com.hk').join(workerHost);
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
