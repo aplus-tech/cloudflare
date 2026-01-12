@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-    const ORIGIN = 'https://aplus-tech.com.hk';
+    const ORIGIN = 'https://test.aplus-tech.com.hk'; // [Phase 4.8.3] 切換到 VPS 測試環境
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
@@ -19,7 +19,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         const assetUrl = `${ORIGIN}${path}${url.search}`;
         try {
             const assetResponse = await fetch(assetUrl, {
-                headers: { 'Host': 'aplus-tech.com.hk' }
+                headers: { 'Host': 'test.aplus-tech.com.hk' }
             });
 
             if (!assetResponse.ok) {
@@ -65,7 +65,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             method: request.method,
             headers: {
                 ...Object.fromEntries(request.headers),
-                'Host': 'aplus-tech.com.hk'
+                'Host': 'test.aplus-tech.com.hk'
             },
             redirect: 'follow'
         });
