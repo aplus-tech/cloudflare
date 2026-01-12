@@ -130,23 +130,30 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 
 ### 測試項目
 
-#### 4.8.1：R2 圖片功能測試
-- [x] 產品圖片上傳到 R2
-- [x] R2 圖片可以預覽
-- [x] WordPress 前台圖片正常顯示
-- [x] URL Validation 正常運作（拒絕 R2 URL）
+#### 4.8.1：VPS WordPress R2 圖片功能測試
+- [x] VPS 產品圖片上傳到 R2 ✅
+- [x] R2 圖片可以預覽 ✅
+- [x] VPS WordPress 前台圖片正常顯示 ✅
+- [x] D1 記錄產品圖片 URL ✅
+
+**測試結果（2026-01-12）**：
+- ✅ VPS WordPress 成功上傳產品圖片到 R2
+- ✅ D1 正確記錄 media_mapping（wordpress_url → r2_url）
+- ✅ VPS WordPress 前台正常顯示 R2 圖片
+
+#### 4.8.3：KV 緩存測試（調整順序，優先測試）
+- [ ] HTML 緩存正常運作
+- [ ] Cache HIT/MISS 正確
+- [ ] 登入用戶繞過緩存
+- [ ] 購物車繞過緩存
+
+**測試目標**：驗證 VPS + Worker + KV 整合，確認頁面速度提升
 
 #### 4.8.2：D1 數據同步測試
 - [ ] 產品同步到 D1 (`sync_products` table)
 - [ ] 文章同步到 D1
 - [ ] media_mapping 正確記錄
 - [ ] 同步速度測試（< 1 秒）
-
-#### 4.8.3：KV 緩存測試
-- [ ] HTML 緩存正常運作
-- [ ] Cache HIT/MISS 正確
-- [ ] 登入用戶繞過緩存
-- [ ] 購物車繞過緩存
 
 #### 4.8.4：Purge API 測試
 - [ ] 更新產品自動清除緩存

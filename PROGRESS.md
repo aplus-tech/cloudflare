@@ -1,56 +1,103 @@
 # 專案進度追蹤
 
-> 更新日期：2025-01-10 | 專案：Cloudflare WordPress Accelerator
+> 最後更新：**2026-01-12** | 用戶確認：✅ Phase 4.8 優先 | 專案：Cloudflare WordPress Accelerator
 
 ---
 
-## 當前狀態
+## 🎯 當前焦點（用戶確認：2026-01-12）
 
-### 🎯 當前目標
-**Phase 4.8：VPS 全面測試（準備生產遷移）**
-- 測試環境：http://15.235.199.194/ (VPS)
-- 測試域名：test.aplus-tech.com.hk（待設定）
-- 目標：確認所有功能正常運作
-- 完成後：將域名 aplus-tech.com.hk 遷移到 VPS
+### 🔴 Phase 4.8：VPS 全面測試（準備生產遷移）
 
-**前置步驟（必須先完成）**：
+**優先級**：P0（用戶確認為當前焦點）
+**狀態**：正在執行
+**開始日期**：2026-01-11
+**最後更新**：2026-01-12
+**進度**：3/8 (37.5%)
+**下一步**：Task 4.8.3 - KV 緩存測試（優先驗證速度）
+
+**用戶備註**：優先完成 VPS 測試，確保生產環境穩定。Phase 4.7 延後至 4.8 完成。
+**任務調整**：2026-01-12 - 優先測試 KV 緩存（4.8.3），驗證頁面速度。
+
+---
+
+#### 測試環境
+**VPS 環境**：
+- VPS IP：15.235.199.194
+- 測試域名：test.aplus-tech.com.hk
+
+**域名配置**：
+- 主域名：aplus-tech.com.hk（Shared Hosting，生產環境）
+- Media 域名：media.aplus-tech.com.hk（R2 圖片）
+- Cloudflare Pages：cloudflare-9qe.pages.dev（Worker URL 代理）
+
+**測試目標**：
+- 確認 VPS WordPress 所有功能正常運作
+- 完成所有功能喺 VPS WordPress 測試後：將主域名 aplus-tech.com.hk 遷移到 VPS
+
+#### 前置步驟（已完成 ✅）
 - [x] Cloudflare DNS 加入 test.aplus-tech.com.hk → 15.235.199.194
 - [x] 更新 VPS WordPress Site URL 為 https://test.aplus-tech.com.hk
 - [x] 驗證 DNS 解析同 SSL 證書
 - [x] 上傳 WordPress Plugin v2.0 到 VPS
 - [x] Activate Plugin
 
-**測試清單**：
-- [x] R2 圖片上傳同步測試
-- [x] R2 圖片預覽測試
-- [x] WordPress 前台圖片顯示測試
-- [ ] WordPress 產品同步測試（D1）
-- [ ] WordPress 文章同步測試（D1）
-- [ ] KV 緩存測試
-- [ ] Purge API 測試
-- [ ] 整體效能測試
+#### ⚠️ 重要說明（2026-01-12 用戶確認）
+**之前測試狀態釐清**：
+- ✅ Shared Hosting (aplus-tech.com.hk)：R2 功能正常運作
+- ❌ VPS (test.aplus-tech.com.hk)：新環境，R2 功能未測試
+- 🎯 當前焦點：確保 VPS WordPress 可以正常同 R2 整合
 
-### ✅ 已完成（60% 總進度）
-- [x] Phase 0：清理與重置
-- [x] Phase 2：基礎設施搭建（SvelteKit + D1 + KV + R2）
-- [x] Phase 3：KV 邊緣緩存（HTML Cache）
-- [x] Phase 4：數據同步管道（WordPress → D1 實時同步）
-- [x] Phase 4.5：R2 語義化媒體遷移（`products/{brand}/filename`）
-- [x] Phase 4.6：混合架構上線（HTML by Origin + Images by R2）
-- [x] AI 規則設定（`.ai/CLAUDE.md` + `.ai/CLAUDE_OPUS.md`）
-- [x] 專案文檔整合（`context.yaml` + `CHANGELOG.md`）
+#### 測試清單（3/8 完成）
+- [x] 4.8.1：VPS WordPress R2 圖片上傳測試 ✅
+- [x] 4.8.1：VPS WordPress R2 圖片預覽測試 ✅
+- [x] 4.8.1：VPS WordPress 前台圖片顯示測試 ✅
+- [ ] 4.8.3：KV 緩存測試 ← 下一步（調整順序，優先測試）
+- [ ] 4.8.2：WordPress 產品同步測試（D1）
+- [ ] 4.8.2：WordPress 文章同步測試（D1）
+- [ ] 4.8.4：Purge API 測試
+- [ ] 4.8.5：整體效能測試
 
-### 🚧 進行中（Phase 4.7）
-- [ ] **Task 4.7.1（P0）**：移除 `wrangler.toml` 明文密碼
-  - [ ] 用 `wrangler secret put` 設定 `SYNC_SECRET_KEY`
-  - [ ] 用 `wrangler secret put` 設定 `PURGE_SECRET`
+---
+
+## ⏸️ 暫停任務（用戶確認延後）
+
+### Phase 4.7：安全與效能優化
+
+**狀態**：等待中
+**原因**：用戶確認 - 等待 Phase 4.8 完成後執行
+**優先級**：P0-P1（移除明文密碼 + KV Cache 優化）
+**最後更新**：2026-01-12
+**計劃開始**：Phase 4.8 完成後
+
+#### 待辦任務
+- [ ] Task 4.7.1（P0）：移除 wrangler.toml 明文密碼
+  - [ ] 用 wrangler secret put 設定 SYNC_SECRET_KEY
+  - [ ] 用 wrangler secret put 設定 PURGE_SECRET
   - [ ] 驗證 WordPress 插件密鑰一致性
-- [ ] **Task 4.7.2（P1）**：優化 media_mapping 查詢（加 KV Cache）
-- [ ] **Task 4.7.3（P1）**：並行上傳圖片（`Promise.all()`）
-- [ ] **Task 4.7.4（P1）**：加入重試機制（Exponential Backoff）
-- [ ] **Task 4.7.5（P1）**：統一緩存 Key 格式
+- [ ] Task 4.7.2（P1）：優化 media_mapping 查詢（加 KV Cache）
+- [ ] Task 4.7.3（P1）：並行上傳圖片（Promise.all）
+- [ ] Task 4.7.4（P1）：加入重試機制（Exponential Backoff）
+- [ ] Task 4.7.5（P1）：統一緩存 Key 格式
 
-### 📋 待辦（Phase 5-8）
+---
+
+## ✅ 已完成
+
+| Phase | 任務 | 完成日期 |
+|-------|------|---------|
+| 4.6 | 混合架構上線（HTML by Origin + Images by R2） | 2026-01-08 |
+| 4.5 | R2 語義化媒體遷移（products/{brand}/filename） | 2026-01-07 |
+| 4.0 | 數據同步管道（WordPress → D1 實時同步） | 2026-01-06 |
+| 3.0 | KV 邊緣緩存（HTML Cache） | 2026-01-06 |
+| 2.0 | 基礎設施搭建（SvelteKit + D1 + KV + R2） | 2026-01-05 |
+| 0.0 | 清理與重置 | 2026-01-04 |
+| - | AI 規則設定（.ai/CLAUDE.md + CLAUDE_OPUS.md） | 2025-01-10 |
+| - | 專案文檔整合（context.yaml + CHANGELOG.md） | 2025-01-10 |
+
+---
+
+## 📋 計劃中（Phase 5-8）
+
 - [ ] **Phase 5**：Invoice/Quotation 系統（PDF 生成 + R2 存儲）
 - [ ] **Phase 6**：AI SEO 自動化系統（Claude API + Cron Worker）
 - [ ] **Phase 7**：全面測試（DNS + Worker + 同步 + 性能）

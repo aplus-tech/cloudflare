@@ -18,14 +18,15 @@ ai:
 
 # 文檔優先順序（AI 會按呢個次序讀）
 priority_docs:
-  - ".ai/CLAUDE.md"                     # 最高優先
-  - ".ai/context.yaml"
+  - ".ai/CLAUDE.md"                     # 最高優先（AI 規則）
+  - ".ai/context.yaml"                  # AI 設定
+  - "PROGRESS.md"                       # 進度追蹤
+  - "task.md"                           # 任務清單
   - "README.md"
-  - "task.md"
-  - "implementation_plan.md"
-  - "architecture_design.md"
   - "docs/ARCHITECTURE.md"
   - "docs/API_SPEC.md"
+  - "implementation_plan.md"
+  - "architecture_design.md"
 
 # 代碼風格
 code_style:
@@ -33,11 +34,3 @@ code_style:
   naming: "camelCase"                   # TypeScript 用 camelCase
   max_line_length: 100
   comment_language: "cantonese"         # 註解用廣東話
-
-# 重要變數
-variables:
-  vps_ip: "15.235.199.194"
-  origin_domain: "origin.aplus-tech.com.hk"
-  main_domain: "aplus-tech.com.hk"
-  media_domain: "media.aplus-tech.com.hk"
-  cloudflare_pages: "cloudflare-9qe.pages.dev"
