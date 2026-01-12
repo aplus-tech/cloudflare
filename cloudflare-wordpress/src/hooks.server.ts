@@ -77,8 +77,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         let html = await response.text();
 
         // 5. 內容替換 (域名與 R2 媒體)
+        // 只有當訪問 cloudflare-9qe.pages.dev 時，先替換域名為自訂網域
         const workerHost = url.host;
-        html = html.split('test.aplus-tech.com.hk').join(workerHost);
+        if (workerHost !== 'test.aplus-tech.com.hk') {
+            html = html.split('test.aplus-tech.com.hk').join(workerHost);
+        }
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
