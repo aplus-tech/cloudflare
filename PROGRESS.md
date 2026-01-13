@@ -192,9 +192,9 @@
 - [task.md](task.md) - 詳細任務清單（680 行）
 - [implementation_plan.md](implementation_plan.md) - 實施計劃（2216 行）
 - [architecture_design.md](architecture_design.md) - 架構設計（完整技術方案）
-- [CHANGELOG.md](CHANGELOG.md) - 改動記錄
 - [.ai/context.yaml](.ai/context.yaml) - 專案設定
+- [.ai/ATTEMPTED_SOLUTIONS.md](.ai/ATTEMPTED_SOLUTIONS.md) - 已嘗試方案記錄（避免重複踩坑）
 
 ---
 
-**最後更新：2025-01-10**
+**最後更新：2026-01-13**

@@ -20,6 +20,7 @@ ai:
 priority_docs:
   - ".ai/CLAUDE.md"                     # 最高優先（AI 規則）
   - ".ai/context.yaml"                  # AI 設定
+  - ".ai/ATTEMPTED_SOLUTIONS.md"        # 已嘗試方案（避免重複）
   - "PROGRESS.md"                       # 進度追蹤
   - "task.md"                           # 任務清單
   - "README.md"
