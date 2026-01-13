@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-    const ORIGIN = 'http://15.235.199.194'; // [Phase 4.8.3] 直接用 VPS IP 避免 DNS loop
+    const ORIGIN = 'https://test.aplus-tech.com.hk'; // 使用域名而唔係 IP，避免 Cloudflare 限制
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
