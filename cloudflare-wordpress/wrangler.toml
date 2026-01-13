@@ -1,6 +1,9 @@
 name = "cloudflare-wordpress"
 pages_build_output_dir = ".svelte-kit/cloudflare"
 
+# 啟用 Node.js 兼容模式（修復 Error 1003）
+compatibility_flags = ["nodejs_compat"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "wordpress-cloudflare"
@@ -14,6 +17,7 @@ id = "695adac89df4448e81b9ffc05f639491"
 binding = "MEDIA_BUCKET"
 bucket_name = "media-bucket"
 
-[vars]
-PURGE_SECRET = "REPLACE_WITH_A_SECURE_KEY"
-SYNC_SECRET_KEY = "Lui@63006021"
+# [vars] 移除明文密碼，改用 wrangler secret put
+# PURGE_SECRET - 用 wrangler secret put PURGE_SECRET 設定
+# SYNC_SECRET_KEY - 用 wrangler secret put SYNC_SECRET_KEY 設定
+
