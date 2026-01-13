@@ -62,16 +62,18 @@
 - 錯誤訊息：`The package "@cloudflare/workerd-linux-64" could not be found`
 - 來源：Cloudflare Pages Build Log (2026-01-13 12:03:41Z)
 
-### ⏳ 嘗試中
+### ✅ 已解決（2026-01-13）
 
-| 日期 | 方案 | 來源/證據 | 狀態 |
-|------|------|----------|------|
-| 2026-01-13 | 移除 `wrangler` 從 devDependencies | [GitHub workerd #320](https://github.com/cloudflare/workerd/issues/320), [#4139](https://github.com/cloudflare/workerd/issues/4139) | 等待 Build 結果 |
+| 日期 | 方案 | 結果 | Commit |
+|------|------|------|--------|
+| 2026-01-13 | 移除 `wrangler` 從 devDependencies | ✅ Build 成功 | [bc565de](https://github.com/aplus-tech/cloudflare/commit/bc565de) |
 
-### 原因分析
-- `wrangler` 包含 `workerd` 作為 optionalDependency
-- Cloudflare Pages Build 環境安裝 `workerd-linux-64` 失敗
-- Cloudflare Pages 唔需要 `wrangler`（Pages 有自己嘅 build 系統）
+### 解決方案詳情
+- **問題**：`wrangler` 包含 `workerd` 作為 optionalDependency，喺 Cloudflare Pages Build 環境安裝失敗
+- **方案**：移除 `wrangler` 從 devDependencies
+- **原因**：Cloudflare Pages 唔需要 `wrangler`（Pages 有自己嘅 build 系統）
+- **來源**：[GitHub workerd #320](https://github.com/cloudflare/workerd/issues/320), [#4139](https://github.com/cloudflare/workerd/issues/4139)
+- **Build 時間**：19:12:22 - 19:13:06 (約 44 秒)
 
 ---
 
