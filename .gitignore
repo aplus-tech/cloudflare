@@ -10,3 +10,6 @@ build
 *.log
 dist
 package-lock.json
+
+# Claude Code CLI 臨時文件
+tmpclaude-*
