@@ -61,13 +61,19 @@ export const handle: Handle = async ({ event, resolve }) => {
     // 4. Proxy 頁面請求
     try {
         const targetUrl = `${ORIGIN}${path}${url.search}`;
+
+        // 複製原有 Headers 但覆蓋 Host，並移除 Cloudflare 特有 Headers
+        const newHeaders = new Headers(request.headers);
+        newHeaders.set('Host', 'test.aplus-tech.com.hk');
+        newHeaders.delete('cf-connecting-ip');
+        newHeaders.delete('cf-ipcountry');
+        newHeaders.delete('cf-ray');
+        newHeaders.delete('cf-visitor');
+
         const response = await fetch(targetUrl, {
             method: request.method,
-            headers: {
-                ...Object.fromEntries(request.headers),
-                'Host': 'test.aplus-tech.com.hk'
-            },
-            redirect: 'follow'
+            headers: newHeaders,
+            redirect: 'manual' // 唔好自動跟隨重定向
         });
 
         // 直接使用 WordPress 嘅 response，包括 404 頁面
