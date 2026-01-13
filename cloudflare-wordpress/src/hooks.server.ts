@@ -70,10 +70,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             redirect: 'follow'
         });
 
-        if (!response.ok && response.status !== 404) {
-            return resolve(event);
-        }
-
+        // 直接使用 WordPress 嘅 response，包括 404 頁面
         let html = await response.text();
 
         // 5. 內容替換 (域名與 R2 媒體)
@@ -109,6 +106,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     } catch (e) {
         console.error('Proxy Error:', e);
-        return resolve(event);
+        return new Response('Error proxying to WordPress origin', {
+            status: 502,
+            headers: { 'Content-Type': 'text/plain' }
+        });
     }
 };
