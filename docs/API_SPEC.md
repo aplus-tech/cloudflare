@@ -54,7 +54,8 @@
 
 ## 4. AI SEO API (Phase 6 - Planned)
 
-> 此模組將從 `web/Marketing Automation` (Python) 移植到 Cloudflare Workers。
+> 此模組將從 `WordPress_Maintenance/WP_Content_System` (Python) 移植到 Cloudflare Workers。
+> 參考 `web/Search_Console_Auto` 實現 GSC 連結登記功能。
 
 ### 4.1 分析文章
 - **Endpoint**: `POST /api/seo/analyze`
