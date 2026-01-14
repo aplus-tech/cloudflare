@@ -15,19 +15,6 @@
 4. [已完成階段總結](#4-已完成階段總結)
 5. [當前系統狀態](#5-當前系統狀態)
 
-### 第三部分：待修復問題（Phase 4.7）
-6. [修復安全漏洞](#6-修復安全漏洞)
-7. [修復性能問題](#7-修復性能問題)
-8. [修復缺失機制](#8-修復缺失機制)
-
-### 第四部分：新功能開發（Phase 5-6）
-9. [Invoice 同 Quotation 系統](#9-invoice-同-quotation-系統)
-10. [AI SEO 自動化系統](#10-ai-seo-自動化系統)
-
-### 第五部分：部署與驗證
-11. [測試清單](#11-測試清單)
-12. [上線切換流程](#12-上線切換流程)
-13. [回滾計劃](#13-回滾計劃)
 
 ---
 
@@ -1564,23 +1551,6 @@ async function generateQuoteNumber(env) {
     .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
     .badge-pending { background: #ffc107; color: #000; }
     .badge-paid { background: #28a745; color: #fff; }
-    .badge-cancelled { background: #dc3545; color: #fff; }
-</style>
-```
-
-【來源證據】
-- architecture_design.md#11 (Invoice 同 Quotation 系統)
-
----
-
-## 10. AI SEO 自動化系統
-
-### 10.1 系統架構
-
-【問題原因】
-手動優化 SEO 工作量大：
-- 每篇文章需要撰寫 SEO Title, Meta Description
-- 選擇合適的 Focus Keyword
 - 需要 SEO 專業知識
 - 時間成本高
 
@@ -2166,23 +2136,6 @@ curl -I https://example.com
 - D1 數據同步
 - R2 圖片遷移
 
-⚠️ **待修復（Phase 4.7）**
-- 安全漏洞（明文密碼）
-- 性能問題（全表查詢、順序上傳）
-- 缺失機制（錯誤重試、緩存 Key 不一致）
-
-🚧 **待開發（Phase 5-6）**
-- Invoice/Quotation 系統
-- AI SEO 自動化系統
-- 監控和告警系統
-
-### 預估時間表
-
-| 階段 | 任務 | 預估時間 |
-|------|------|----------|
-| Phase 4.7 | 修復安全漏洞和性能問題 | 1-2 天 |
-| Phase 5 | Invoice/Quote 系統開發 | 3-5 天 |
-| Phase 6 | AI SEO 系統開發 | 2-3 天 |
 | 測試和驗證 | 全面測試 | 1-2 天 |
 | 上線切換 | DNS 切換和監控 | 1 天 |
 | **總計** | | **8-13 天** |

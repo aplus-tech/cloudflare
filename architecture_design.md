@@ -336,6 +336,12 @@ Invoice Worker 接收
 - package.json:14 (@sveltejs/kit)
 - svelte.config.js:1-18 (adapter-cloudflare 配置)
 
+#### 3.1.1 現有架構整合 (`web/Svelte`)
+- **專案位置**：`web/Svelte` (獨立於 WordPress 的 SvelteKit 項目)
+- **現有功能**：Admin Dashboard (Products, Orders, Posts, Customers)
+- **Phase 5 目標**：在此項目中新增 Invoice/Quotation 模組 (`/admin/invoices`)
+- **Phase 6 目標**：將 `web/Marketing Automation` (Python) 邏輯移植到此項目 (TypeScript)
+
 ### 3.2 數據庫
 
 **選擇：Cloudflare D1 (SQLite)**
@@ -389,6 +395,11 @@ Invoice Worker 接收
 【來源證據】
 - refresh-idea.md:696-703 (成本分析)
 - refresh-idea.md:669-688 (Prompt 設計)
+
+#### 3.4.1 遷移策略 (Python to SvelteKit)
+- **來源參考**：`web/Search_Console_Auto` & `web/Marketing Automation`
+- **執行方式**：將 Python 腳本 (如 `keyword_clustering.py`) 重寫為 Cloudflare Workers (TypeScript)
+- **整合目標**：完全整合至 `web/Svelte` Admin 後台，不再依賴本地 Python 環境
 
 ---
 
