@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-    const ORIGIN = 'http://origin.aplus-tech.com.hk'; // 灰雲 DNS-Only，直達 VPS 避免 redirect loop
+    const ORIGIN = 'http://15.235.199.194'; // VPS IP，避開 DNS 問題（Gemini 方案）
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
@@ -19,7 +19,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         const assetUrl = `${ORIGIN}${path}${url.search}`;
         try {
             const assetResponse = await fetch(assetUrl, {
-                headers: { 'Host': 'origin.aplus-tech.com.hk' }
+                headers: { 'Host': 'test.aplus-tech.com.hk' }
             });
 
             if (!assetResponse.ok) {
@@ -64,7 +64,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         // 複製原有 Headers 但覆蓋 Host，並移除 Cloudflare 特有 Headers
         const newHeaders = new Headers(request.headers);
-        newHeaders.set('Host', 'origin.aplus-tech.com.hk');
+        newHeaders.set('Host', 'test.aplus-tech.com.hk'); // VPS WordPress Site URL
         newHeaders.delete('cf-connecting-ip');
         newHeaders.delete('cf-ipcountry');
         newHeaders.delete('cf-ray');
