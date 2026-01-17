@@ -32,7 +32,6 @@
 
 | 日期 | 方案 | 結果 | Commit | 失敗原因 |
 |------|------|------|--------|---------|
-| 2026-01-17 | 方案 C：替換 origin → currentHost | ❌ | [4fbf47d](https://github.com/aplus-tech/cloudflare/commit/4fbf47d) | 結果同方案 A/B 一樣，`test` 內頁跳 `pages.dev` |
 | 2026-01-17 | 方案 B：方案 A + 清理 WordPress 資料庫 | ❌ | MySQL UPDATE | 結果同方案 A 一樣，`test` 內頁跳 `pages.dev` |
 | 2026-01-17 | 方案 A：條件判斷 + VPS 用 `origin` | ❌ | [1c5da81](https://github.com/aplus-tech/cloudflare/commit/1c5da81) | `test` 內頁跳 `pages.dev`，`pages.dev` 部分頁跳 `origin` |
 | 2026-01-17 | 改返 `origin` 域名 + Custom Domain + VPS 用 `https://test` | ❌ | 手動改 | 首頁正常，其他頁面 redirect 去 `cloudflare-9qe.pages.dev`，部分頁面 Error 1003 |
@@ -45,20 +44,28 @@
 | 2026-01-10 | 加 compatibility_date for nodejs_compat | ❌ | [097a04f](https://github.com/aplus-tech/cloudflare/commit/097a04f) | 未解決 521 |
 | 2026-01-10 | 加 nodejs_compat flag | ❌ | [ba1f4da](https://github.com/aplus-tech/cloudflare/commit/ba1f4da) | Error 1003 |
 
-### ⏳ 待試方案
+### ✅ 已解決（2026-01-17）
 
-| 方案 | 來源/證據 | 狀態 |
-|------|----------|------|
-| 檢查 VPS Docker 運行狀態 (`docker ps`) | 用戶提出 (2026-01-13) | 待執行 |
-| 檢查 VPS Nginx 設定 (port 80/443) | [!Uncertain: 需要 SSH 確認] | 待執行 |
-| 檢查 VPS Firewall 設定 | [!Uncertain: 需要 SSH 確認] | 待執行 |
-| 直接 curl VPS IP (`curl -I http://15.235.199.194`) | 用戶提出 (2026-01-13) | 待執行 |
+| 日期 | 方案 | 結果 | Commit | 備註 |
+|------|------|------|--------|------|
+| 2026-01-17 | 方案 C：替換 origin → currentHost + 清空 KV Cache | ✅ | [4fbf47d](https://github.com/aplus-tech/cloudflare/commit/4fbf47d) | 速度快，所有頁面正常 |
 
-### 💡 可能根本原因
-- [!Uncertain: 以下需要實際檢查確認]
-1. VPS 上嘅 WordPress/Nginx 未運行
-2. VPS Firewall 封鎖咗連線
-3. Docker container 未啟動
+### 解決方案詳情
+- **問題**：方案 A/B/C 都失敗，因為 KV Cache 存咗錯誤內容
+- **方案**：
+  1. Worker URL 替換：`origin` → `currentHost`（無條件替換）
+  2. 清空 KV Cache（193 個項目）
+  3. 重新訪問頁面，生成正確 cache
+- **結果**：
+  - `test.aplus-tech.com.hk` - ✅ 所有頁面正常，速度快
+  - `cloudflare-9qe.pages.dev` - ✅ 正確 redirect 去 Custom Domain
+  - `origin.aplus-tech.com.hk` - ✅ VPS 直連正常
+- **來源**：
+  - Worker 代碼：`hooks.server.ts:87-88`
+  - KV Cache 清空 API：`/api/purge-all?secret=Lui@63006021`
+
+### 💡 根本原因
+KV Cache 入面存咗舊嘅錯誤 HTML（包含錯誤 URL），導致 redirect loop。清空 cache 後問題解決。
 
 ---
 
