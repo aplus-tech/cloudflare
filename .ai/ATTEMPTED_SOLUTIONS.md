@@ -156,6 +156,34 @@ https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021
 
 ## ✅ 成功方案記錄
 
+### wp-admin 白屏問題修復 (2026-01-17)
+
+| 問題 | 方案 | Commit | 來源 |
+|------|------|--------|------|
+| `test.aplus-tech.com.hk/wp-admin` 白屏 | wp-admin bypass - 302 redirect 去 origin | [c8f0d97](https://github.com/aplus-tech/cloudflare/commit/c8f0d97) | `hooks.server.ts:14-17` |
+
+**問題描述**：
+- 訪問 `https://test.aplus-tech.com.hk/wp-admin/` 出現白屏
+- `http://origin.aplus-tech.com.hk/wp-admin/` 可以正常訪問
+
+**根本原因**：
+Worker URL 替換邏輯影響 wp-admin 頁面入面嘅 JavaScript/CSS URL，導致白屏
+
+**解決方案**：
+```typescript
+// WordPress Admin 直接 redirect 去 origin（避免 URL 替換問題）
+if (path.startsWith('/wp-admin') || path.startsWith('/wp-login.php')) {
+    return Response.redirect(`http://origin.aplus-tech.com.hk${path}${url.search}`, 302);
+}
+```
+
+**測試結果**：
+- ✅ `https://test.aplus-tech.com.hk/wp-admin/` → 302 redirect → `http://origin.aplus-tech.com.hk/wp-admin/`
+- ✅ 可以正常登入 WordPress Admin
+- ✅ 前台頁面唔受影響，繼續使用 Worker proxy
+
+---
+
 ### R2 圖片上傳修復 (2026-01-11)
 
 | 問題 | 方案 | Commit | 來源 |
