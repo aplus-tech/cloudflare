@@ -11,6 +11,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         return resolve(event);
     }
 
+    // 2. WordPress Admin 直接 redirect 去 origin（避免 URL 替換問題）
+    if (path.startsWith('/wp-admin') || path.startsWith('/wp-login.php')) {
+        return Response.redirect(`http://origin.aplus-tech.com.hk${path}${url.search}`, 302);
+    }
+
     // 2. 處理靜態資源 (CSS, JS, Images, Fonts) 的代理
     const staticExtensions = ['.css', '.js', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.ico'];
     const isStaticAsset = staticExtensions.some(ext => path.toLowerCase().endsWith(ext));
