@@ -141,13 +141,24 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 - ✅ D1 正確記錄 media_mapping（wordpress_url → r2_url）
 - ✅ VPS WordPress 前台正常顯示 R2 圖片
 
-#### 4.8.3：KV 緩存測試（調整順序，優先測試）
-- [ ] HTML 緩存正常運作
-- [ ] Cache HIT/MISS 正確
-- [ ] 登入用戶繞過緩存
-- [ ] 購物車繞過緩存
+#### 4.8.3：KV 緩存測試（✅ 2026-01-17 完成）
+- [x] HTML 緩存正常運作 ✅
+- [x] Cache HIT/MISS 正確 ✅
+- [x] 登入用戶繞過緩存 ✅
+- [x] 購物車繞過緩存 ✅
+- [x] 解決 redirect loop 問題 ✅
+- [x] 頁面速度提升驗證 ✅
 
-**測試目標**：驗證 VPS + Worker + KV 整合，確認頁面速度提升
+**測試結果（2026-01-17）**：
+- ✅ 成功解決 redirect loop 問題（方案 C + 清空 KV Cache）
+- ✅ KV Cache 生效，頁面載入速度明顯提升
+- ✅ `test.aplus-tech.com.hk` 所有頁面正常運作
+- ✅ `cloudflare-9qe.pages.dev` 正確 redirect 去 Custom Domain
+
+**相關文檔**：
+- `.ai/ATTEMPTED_SOLUTIONS.md` - 詳細記錄失敗方案 A/B 同成功方案 C
+- `PROGRESS.md` - 完整測試過程記錄
+- Commit: [4fbf47d](https://github.com/aplus-tech/cloudflare/commit/4fbf47d), [f21f7d8](https://github.com/aplus-tech/cloudflare/commit/f21f7d8)
 
 #### 4.8.2：D1 數據同步測試
 - [ ] 產品同步到 D1 (`sync_products` table)
