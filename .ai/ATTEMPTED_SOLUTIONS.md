@@ -32,6 +32,13 @@
 
 | 日期 | 方案 | 結果 | Commit | 失敗原因 |
 |------|------|------|--------|---------|
+| 2026-01-17 | 方案 C：替換 origin → currentHost | ❌ | [4fbf47d](https://github.com/aplus-tech/cloudflare/commit/4fbf47d) | 結果同方案 A/B 一樣，`test` 內頁跳 `pages.dev` |
+| 2026-01-17 | 方案 B：方案 A + 清理 WordPress 資料庫 | ❌ | MySQL UPDATE | 結果同方案 A 一樣，`test` 內頁跳 `pages.dev` |
+| 2026-01-17 | 方案 A：條件判斷 + VPS 用 `origin` | ❌ | [1c5da81](https://github.com/aplus-tech/cloudflare/commit/1c5da81) | `test` 內頁跳 `pages.dev`，`pages.dev` 部分頁跳 `origin` |
+| 2026-01-17 | 改返 `origin` 域名 + Custom Domain + VPS 用 `https://test` | ❌ | 手動改 | 首頁正常，其他頁面 redirect 去 `cloudflare-9qe.pages.dev`，部分頁面 Error 1003 |
+| 2026-01-17 | Gemini 方案：VPS IP + test Host header（冇 Custom Domain）| ❌ | [93d0434](https://github.com/aplus-tech/cloudflare/commit/93d0434) | `test` Error 522, `pages.dev` Error 1003 Direct IP access not allowed |
+| 2026-01-17 | `test` CNAME → Pages + Custom Domain 設定 | ❌ | DNS 設定 | 首頁正常，其他頁面 redirect 去 `cloudflare-9qe.pages.dev` |
+| 2026-01-13 | `test` CNAME → `cloudflare-9qe.pages.dev`（冇 Custom Domain）| ❌ | DNS 設定 | Error 522 Connection timed out |
 | 2026-01-13 | 改用 HTTP origin (`http://test.aplus-tech.com.hk`) | ❌ | [3da638b](https://github.com/aplus-tech/cloudflare/commit/3da638b) | Build 失敗 (workerd-linux-64) |
 | 2026-01-12 | 設定正確 Host header + 移除 CF headers | ❌ | [f990811](https://github.com/aplus-tech/cloudflare/commit/f990811) | 仍然 521 |
 | 2026-01-12 | 用域名代替 IP (`test.aplus-tech.com.hk`) | ❌ | [b133d7a](https://github.com/aplus-tech/cloudflare/commit/b133d7a) | Error 1003 |
@@ -122,6 +129,21 @@
 | wordpress-app | 0.0.0.0:80->80/tcp | ✅ 運行中 |
 | wordpress-redis | 6379/tcp (內部) | ✅ 運行中 |
 | wordpress-db | 3306/tcp (內部) | ✅ 運行中 |
+
+---
+
+## 🛠️ 工具與指令記錄
+
+### KV Cache 清空
+
+**API 端點**：
+```
+https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021
+```
+
+**用途**：清空所有 KV Cache（解決 redirect loop 問題）
+
+**來源**：`cloudflare-wordpress/src/routes/api/purge-all/+server.ts`
 
 ---
 
