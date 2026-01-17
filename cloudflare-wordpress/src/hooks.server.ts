@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 export const handle: Handle = async ({ event, resolve }) => {
     const { url, platform, request, cookies } = event;
     const path = url.pathname;
-    const ORIGIN = 'http://15.235.199.194'; // VPS IP，避開 DNS 問題（Gemini 方案）
+    const ORIGIN = 'http://origin.aplus-tech.com.hk'; // 灰雲 DNS-Only，直達 VPS
 
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     // 1. 允許 SvelteKit 內部的 API 正常運作
@@ -19,7 +19,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         const assetUrl = `${ORIGIN}${path}${url.search}`;
         try {
             const assetResponse = await fetch(assetUrl, {
-                headers: { 'Host': 'test.aplus-tech.com.hk' }
+                headers: { 'Host': 'origin.aplus-tech.com.hk' }
             });
 
             if (!assetResponse.ok) {
@@ -64,7 +64,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
         // 複製原有 Headers 但覆蓋 Host，並移除 Cloudflare 特有 Headers
         const newHeaders = new Headers(request.headers);
-        newHeaders.set('Host', 'test.aplus-tech.com.hk'); // VPS WordPress Site URL
+        newHeaders.set('Host', 'origin.aplus-tech.com.hk'); // VPS origin 域名（灰雲）
         newHeaders.delete('cf-connecting-ip');
         newHeaders.delete('cf-ipcountry');
         newHeaders.delete('cf-ray');
@@ -80,16 +80,14 @@ export const handle: Handle = async ({ event, resolve }) => {
         let html = await response.text();
 
         // 5. 內容替換 (域名與 R2 媒體)
-        // 將 WordPress 返回嘅 HTML 入面嘅 origin URL 替換成當前訪問嘅域名
+        // 只有訪問 pages.dev 時先替換域名（避免 Custom Domain 內頁跳轉問題）
         const currentHost = url.host;
-        const targetHost = 'origin.aplus-tech.com.hk'; // VPS WordPress 設定嘅域名（灰雲 DNS-Only）
 
-        // 替換 WordPress 內部 URL 為當前訪問嘅域名
-        html = html.split(`http://15.235.199.194`).join(`https://${currentHost}`);
-        html = html.split(`https://origin.aplus-tech.com.hk`).join(`https://${currentHost}`);
-        html = html.split(`http://origin.aplus-tech.com.hk`).join(`https://${currentHost}`);
-        html = html.split(`https://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
-        html = html.split(`http://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
+        // 只有訪問 cloudflare-9qe.pages.dev 時先替換 test 域名
+        if (currentHost !== 'test.aplus-tech.com.hk') {
+            html = html.split(`https://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
+            html = html.split(`http://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
+        }
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
