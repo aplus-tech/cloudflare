@@ -80,14 +80,12 @@ export const handle: Handle = async ({ event, resolve }) => {
         let html = await response.text();
 
         // 5. 內容替換 (域名與 R2 媒體)
-        // 只有訪問 pages.dev 時先替換域名（避免 Custom Domain 內頁跳轉問題）
+        // 替換 origin URL 為當前訪問嘅域名
         const currentHost = url.host;
 
-        // 只有訪問 cloudflare-9qe.pages.dev 時先替換 test 域名
-        if (currentHost !== 'test.aplus-tech.com.hk') {
-            html = html.split(`https://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
-            html = html.split(`http://test.aplus-tech.com.hk`).join(`https://${currentHost}`);
-        }
+        // 將 WordPress 輸出嘅 origin URL 替換成當前訪問嘅域名
+        html = html.split(`https://origin.aplus-tech.com.hk`).join(`https://${currentHost}`);
+        html = html.split(`http://origin.aplus-tech.com.hk`).join(`https://${currentHost}`);
 
         if (db) {
             const { results: mappings } = await db.prepare('SELECT original_url, r2_path FROM media_mapping').all();
