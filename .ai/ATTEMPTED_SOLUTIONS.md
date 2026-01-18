@@ -229,9 +229,42 @@ SYNC_SECRET_KEY = "Lui@63006021"
 
 ---
 
+### Purge API 測試發現 KV Cache 問題 (2026-01-18)
+
+**問題描述**：
+- 測試 Purge API 後，訪問 `https://test.aplus-tech.com.hk/` 首頁時返回 WooCommerce AJAX JSON response 而唔係 HTML
+- JSON 內容：`{"fragments":{"div.widget_shopping_cart_content":"...購物車內無任何商品...","span.header-cart-empty-check":"...","span.header-cart-total":"0..."},"cart_hash":""}`
+- 用戶冇下單，但收到購物車 JSON response
+
+**可能原因**：
+1. KV Cache 可能儲存咗錯誤嘅 response（AJAX response 被當成 HTML cache）
+2. WordPress 返回錯誤嘅 Content-Type
+3. Cloudflare Pages hooks.server.ts 處理 request 時出錯
+
+**待驗證**：
+- [ ] 清空所有 KV Cache（`https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021`）
+- [ ] 檢查 hooks.server.ts 有冇正確過濾 AJAX request
+- [ ] 檢查 WordPress 返回嘅 Content-Type header
+- [ ] 檢查 KV Cache key 格式係咪正確
+
+**相關檔案**：
+- `src/hooks.server.ts` - KV Cache 邏輯
+- `src/routes/api/purge/+server.ts` - Purge API
+- `Wordpress Plugin/wp-cache-purge.php` - WordPress Plugin
+
+**測試頁面**：
+```
+https://test.aplus-tech.com.hk/
+```
+
+**發現時間**：2026-01-18 22:30 UTC（Phase 4.8.4 Purge API 測試後）
+
+---
+
 ## 更新記錄
 
 | 日期 | 更新內容 | 更新者 |
 |------|---------|--------|
+| 2026-01-18 | 記錄 Purge API 測試後發現 KV Cache 返回錯誤 response | AI (Claude Sonnet 4.5) |
 | 2026-01-18 | 記錄 Phase 4.8.2 D1 同步認證問題修復 | AI (Claude Sonnet 4.5) |
 | 2026-01-13 | 創建文件，記錄 Error 521、Build Failed、Connection Refused | AI (Claude Opus 4) |

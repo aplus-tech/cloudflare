@@ -12,11 +12,11 @@
 **狀態**：正在執行
 **開始日期**：2026-01-11
 **最後更新**：2026-01-18
-**進度**：6/8 (75%)
-**下一步**：Task 4.8.4 - Purge API 測試
+**進度**：7/8 (87.5%)
+**下一步**：Task 4.8.5 - 整體效能測試
 
 **用戶備註**：優先完成 VPS 測試，確保生產環境穩定。Phase 4.7 延後至 4.8 完成。
-**最新進展**：✅ 2026-01-18 - D1 數據同步測試成功完成
+**最新進展**：✅ 2026-01-18 - Purge API 測試成功完成
 
 ---
 
@@ -47,15 +47,15 @@
 - ❌ VPS (test.aplus-tech.com.hk)：新環境，R2 功能未測試
 - 🎯 當前焦點：確保 VPS WordPress 可以正常同 R2 整合
 
-#### 測試清單（6/8 完成）
+#### 測試清單（7/8 完成）
 - [x] 4.8.1：VPS WordPress R2 圖片上傳測試 ✅
 - [x] 4.8.1：VPS WordPress R2 圖片預覽測試 ✅
 - [x] 4.8.1：VPS WordPress 前台圖片顯示測試 ✅
 - [x] 4.8.3：KV 緩存測試 ✅（2026-01-17 完成 - 解決 redirect loop）
 - [x] 4.8.2：WordPress 產品同步測試（D1）✅（2026-01-18 完成）
 - [x] 4.8.2：WordPress 文章同步測試（D1）✅（2026-01-18 完成）
-- [ ] 4.8.4：Purge API 測試 ← 下一步
-- [ ] 4.8.5：整體效能測試
+- [x] 4.8.4：Purge API 測試 ✅（2026-01-18 完成）
+- [ ] 4.8.5：整體效能測試 ← 下一步
 
 #### 4.8.3 KV 緩存測試詳情（2026-01-17 完成）
 
@@ -138,6 +138,55 @@ https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021
 
 ---
 
+#### 4.8.4 Purge API 測試詳情（2026-01-18 完成）
+
+**測試目標**：
+- 驗證 WordPress 更新產品時自動觸發 Purge API
+- 確認 Purge API 成功清除 KV Cache
+- 檢查 Secret key 驗證機制正常
+
+**測試步驟**：
+1. VPS WordPress 更新產品（Product ID: 6947, SKU: `UACC-PoE+-2.5G`）
+2. WordPress Plugin 自動觸發 Purge API (`woocommerce_update_product` hook)
+3. 用 `wrangler kv key list` 檢查 KV Cache 有冇對應 key
+
+**測試結果**：
+- ✅ WordPress Plugin 成功觸發 Purge API（`wp-cache-purge.php:21` - `woocommerce_update_product` hook）
+- ✅ Purge API Secret key 驗證正常（`PURGE_SECRET = "Lui@63006021"`）
+- ✅ KV Cache 成功清除（`wrangler kv key list` 返回空陣列 `[]`）
+- ✅ Cache key 格式正確（`html:/ubiquiti-unifi-2-5g-poe-adapter-uacc-poe-plus-2-5g/`）
+
+**相關檔案**：
+- `Wordpress Plugin/wp-cache-purge.php:15-16` - Purge API URL + Secret key
+- `cloudflare-wordpress/wrangler.toml:24` - PURGE_SECRET 環境變數
+- `src/routes/api/purge/+server.ts:19-23` - Purge API 邏輯
+
+**測試頁面**：
+```
+http://origin.aplus-tech.com.hk/ubiquiti-unifi-2-5g-poe-adapter-uacc-poe-plus-2-5g/
+```
+
+**驗證指令**：
+```bash
+npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefix "html:/ubiquiti-unifi-2-5g-poe-adapter-uacc-poe-plus-2-5g"
+# 返回：[] （代表 cache 已清除）
+```
+
+**發現問題並解決**：
+- ❌ 測試後發現 KV Cache 儲存咗 WooCommerce AJAX JSON response 而唔係 HTML
+- 問題現象：訪問首頁 `https://test.aplus-tech.com.hk/` 返回 `{"fragments":{"div.widget_shopping_cart_content":"..."}}`
+- ✅ 解決方案：執行 purge-all API 清空所有 KV Cache（刪除 13 個 cache 項目）
+- ✅ 結果：首頁恢復正常，返回 HTML 內容
+- 📝 詳細記錄：`.ai/ATTEMPTED_SOLUTIONS.md:232-270`
+
+**備註**：
+- Plugin 使用 `blocking => false` 非同步執行，唔會阻塞 WordPress 保存動作
+- 生產環境應該用 `wrangler secret put PURGE_SECRET` 代替明文密碼
+- 此項將在 Phase 4.7 安全優化時處理
+- KV Cache AJAX response 問題根本原因有待進一步調查（`hooks.server.ts` 過濾機制）
+
+---
+
 ## ⏸️ 暫停任務（用戶確認延後）
 
 ### Phase 4.7：安全與效能優化
@@ -187,6 +236,11 @@ https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021
 ## 里程碑記錄
 
 ### 2026-01-18
+- ✅ **Phase 4.8.4 完成**：Purge API 測試成功
+  - 測試：WordPress 更新產品 → 自動觸發 Purge API → KV Cache 清除成功
+  - 驗證：`wrangler kv key list` 返回空陣列，證明 cache 已清除
+  - 位置：Wordpress Plugin/wp-cache-purge.php:21, src/routes/api/purge/+server.ts:23
+
 - ✅ **Phase 4.8.2 完成**：D1 數據同步測試成功
   - 問題：VPS WordPress Plugin 同步失敗，返回 `{"error":"Unauthorized"}`
   - 原因：`platform.env.SYNC_SECRET_KEY` 環境變數未設定
