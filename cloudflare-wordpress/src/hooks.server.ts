@@ -44,7 +44,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         }
     }
 
-    const cacheKey = `html:${path}`;
+    const cacheKey = `html:${url.pathname}${url.search}`;
     const kv = platform?.env.HTML_CACHE;
     const db = platform?.env.DB;
 
