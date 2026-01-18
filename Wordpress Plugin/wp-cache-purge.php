@@ -13,7 +13,7 @@ class APlus_CF_Purge
 {
     // [Verified: Phase 4.6: 邊緣驗證與正式切換]
     private $purge_url = 'https://cloudflare-9qe.pages.dev/api/purge';
-    private $secret_key = 'REPLACE_WITH_A_SECURE_KEY'; // 請確保與 wrangler.toml 的 PURGE_SECRET 一致
+    private $secret_key = 'Lui@63006021'; // 與 wrangler.toml PURGE_SECRET 一致
 
     public function __construct()
     {

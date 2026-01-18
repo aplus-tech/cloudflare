@@ -21,4 +21,5 @@ bucket_name = "media-bucket"
 # [vars] 臨時測試用 - 生產環境應該用 wrangler secret put
 [vars]
 SYNC_SECRET_KEY = "Lui@63006021"
+PURGE_SECRET = "Lui@63006021"
 
