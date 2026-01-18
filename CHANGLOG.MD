@@ -9,7 +9,31 @@
 ### 完成 Completed
 | 時間 | 改動 | 來源證據 |
 |------|------|---------|
+| 19:30 UTC | Phase 4.8.5：整體效能測試 ✅（KV Cache 加速 96%） | PROGRESS.md:191-222 |
 | 18:02 UTC | Phase 4.8.2：VPS WordPress D1 數據同步測試 ✅ | PROGRESS.md:97-138 |
+
+#### Phase 4.8.5 效能測試詳情
+
+**【問題原因】**
+- 需要驗證 KV Cache 實際加速效果
+- 測試首頁同產品頁效能表現
+- 確認 HTTP Header 正確顯示 cache 狀態
+
+**【方案成立】**
+- 清空 KV Cache（執行 purge-all API）
+- 用 `curl -w` 測量 TTFB（Time To First Byte）同總時間
+- 首次訪問記錄無 cache 時間，二次訪問記錄有 cache 時間
+- 檢查 HTTP Header `X-Cache: HIT/MISS` 驗證 cache 狀態
+
+**【來源證據】**
+- PROGRESS.md:191-222（詳細測試結果）
+- 首頁加速：3.59s → 0.15s（23.9x，96% 減少）
+- 產品頁加速：2.62s → 0.11s（23.8x，96% 減少）
+- HTTP Header: `X-Cache: HIT`, `cf-cache-status: DYNAMIC`
+- Cache key 格式：`html:${url.pathname}${url.search}`
+- TTL: 24 小時（`expirationTtl: 3600 * 24`）
+
+#### Phase 4.8.2 D1 同步測試詳情
 
 **【問題原因】**
 - VPS WordPress Plugin 同步失敗，API 返回 `{"error":"Unauthorized"}`
@@ -33,7 +57,32 @@
 ### 修復 Fixed
 | 時間 | 改動 | 來源證據 |
 |------|------|---------|
+| 19:15 UTC | 修復 Cache Key 格式不一致問題（避免 AJAX 被 cache） | hooks.server.ts:47 |
 | 17:53 UTC | 修復 D1 同步認證問題（SYNC_SECRET_KEY 環境變數） | wrangler.toml:21-23 |
+
+#### Cache Key 格式修復詳情
+
+**【問題原因】**
+- hooks.server.ts 使用 `html:${path}` (只有 pathname)
+- purge/+server.ts 使用 `html:${pathname}${search}` (包含 query string)
+- 格式不一致導致 WooCommerce AJAX request（有 query params）被錯誤 cache 成 HTML
+- 首頁返回 JSON 而唔係 HTML：`{"fragments":{"div.widget_shopping_cart_content":"..."}}`
+
+**【方案成立】**
+```typescript
+// hooks.server.ts Line 47
+// 修改前：const cacheKey = `html:${path}`;
+// 修改後：
+const cacheKey = `html:${url.pathname}${url.search}`;
+```
+
+**【來源證據】**
+- 修復位置：cloudflare-wordpress/src/hooks.server.ts:47
+- Git Commit: 3fcce19
+- 對比檔案：src/routes/api/purge/+server.ts:19-20（purge API 本身已用正確格式）
+- 詳細記錄：.ai/ATTEMPTED_SOLUTIONS.md:232-270
+
+#### D1 同步認證修復詳情
 
 **【問題原因】**
 - 之前 `wrangler.toml` 移除咗明文密碼
