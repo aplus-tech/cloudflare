@@ -193,8 +193,45 @@ if (path.startsWith('/wp-admin') || path.startsWith('/wp-login.php')) {
 
 ---
 
+### D1 同步認證問題修復 (2026-01-18)
+
+| 問題 | 方案 | Commit | 來源 |
+|------|------|--------|------|
+| VPS WordPress Plugin 同步失敗 `{"error":"Unauthorized"}` | 修改 `wrangler.toml` 加返 `[vars]` section 設定 SYNC_SECRET_KEY | [fda2c0b](https://github.com/aplus-tech/cloudflare/commit/fda2c0b) | [PROGRESS.md:97-138](../PROGRESS.md#L97-L138) |
+
+**問題描述**：
+- VPS WordPress 更新產品後，API 返回 `{"error":"Unauthorized"}`
+- WordPress debug.log 顯示多次 401 錯誤
+- D1 數據庫冇收到任何同步數據
+
+**根本原因**：
+- `platform.env.SYNC_SECRET_KEY` 環境變數未設定
+- 之前 `wrangler.toml` 移除咗明文密碼，但冇用 `wrangler secret put` 設定環境變數
+
+**解決方案**：
+```toml
+# wrangler.toml Lines 21-23
+# [vars] 臨時測試用 - 生產環境應該用 wrangler secret put
+[vars]
+SYNC_SECRET_KEY = "Lui@63006021"
+```
+
+**測試結果**：
+- ✅ Product ID: 6947 成功同步到 D1
+- ✅ SKU: `UACC-PoE+-2.5G` 正確記錄
+- ✅ R2 圖片上傳成功：`products/ubiquiti-unifi/%E4%B8%8B%E8%BC%89-3.avif`
+- ✅ API 返回 `{"success":true,"message":"Sync completed"}`
+
+**WordPress Debug Log**：
+```
+[18-Jan-2026 17:53:43 UTC] D1 Sync Response: {"success":true,"message":"Sync completed","r2_data":{"image_r2_path":"products/ubiquiti-unifi/%E4%B8%8B%E8%BC%89-3.avif","gallery_r2_paths":[]}}
+```
+
+---
+
 ## 更新記錄
 
 | 日期 | 更新內容 | 更新者 |
 |------|---------|--------|
+| 2026-01-18 | 記錄 Phase 4.8.2 D1 同步認證問題修復 | AI (Claude Sonnet 4.5) |
 | 2026-01-13 | 創建文件，記錄 Error 521、Build Failed、Connection Refused | AI (Claude Opus 4) |

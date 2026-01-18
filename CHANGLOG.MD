@@ -4,6 +4,68 @@
 
 ---
 
+## 2026-01-18
+
+### 完成 Completed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 18:02 UTC | Phase 4.8.2：VPS WordPress D1 數據同步測試 ✅ | PROGRESS.md:97-138 |
+
+**【問題原因】**
+- VPS WordPress Plugin 同步失敗，API 返回 `{"error":"Unauthorized"}`
+- WordPress debug.log 顯示多次 401 錯誤
+- D1 數據庫查詢結果為空
+- 根本原因：`platform.env.SYNC_SECRET_KEY` 環境變數未設定
+
+**【方案成立】**
+- 修改 `wrangler.toml` 加返 `[vars]` section
+- 暫時用明文 `SYNC_SECRET_KEY = "Lui@63006021"`（測試用）
+- Git commit + push 觸發 Cloudflare Pages 部署
+- 等待部署完成（約 5 分鐘）
+
+**【來源證據】**
+- PROGRESS.md:97-138（測試詳情）
+- PROGRESS.md:145-152（里程碑記錄）
+- .ai/ATTEMPTED_SOLUTIONS.md:189-222（成功方案記錄）
+- Git Commit: fda2c0b
+- 測試結果：Product ID 6947 成功同步到 D1，SKU: `UACC-PoE+-2.5G`
+
+### 修復 Fixed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 17:53 UTC | 修復 D1 同步認證問題（SYNC_SECRET_KEY 環境變數） | wrangler.toml:21-23 |
+
+**【問題原因】**
+- 之前 `wrangler.toml` 移除咗明文密碼
+- 但冇用 `wrangler secret put` 設定環境變數
+- 導致 `platform.env.SYNC_SECRET_KEY` 為 `undefined`
+- API 驗證失敗：`secret !== platform.env.SYNC_SECRET_KEY`
+
+**【方案成立】**
+```toml
+# wrangler.toml Lines 21-23
+# [vars] 臨時測試用 - 生產環境應該用 wrangler secret put
+[vars]
+SYNC_SECRET_KEY = "Lui@63006021"
+```
+
+**【來源證據】**
+- 修復位置：cloudflare-wordpress/wrangler.toml:21-23
+- Git Commit: fda2c0b
+- WordPress Debug Log: `[18-Jan-2026 17:53:43 UTC] D1 Sync Response: {"success":true}`
+
+### 測試結果 Test Results
+| 項目 | 結果 | 證據 |
+|------|------|------|
+| Product ID 6947 同步到 D1 | ✅ | D1 Query Result |
+| SKU 正確記錄 | ✅ `UACC-PoE+-2.5G` | D1 Query Result |
+| R2 圖片上傳 | ✅ `products/ubiquiti-unifi/%E4%B8%8B%E8%BC%89-3.avif` | API Response |
+| API 認證 | ✅ `{"success":true}` | WordPress Debug Log |
+| D1 總產品數 | ✅ 12 條記錄 | D1 Query: `SELECT COUNT(*) FROM sync_products` |
+| Updated timestamp | ✅ 1768759354 (2026-01-18 05:55:54 UTC) | D1 Query Result |
+
+---
+
 ## 2026-01-12
 
 ### 完成 Completed
