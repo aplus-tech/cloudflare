@@ -18,7 +18,7 @@ id = "695adac89df4448e81b9ffc05f639491"
 binding = "MEDIA_BUCKET"
 bucket_name = "media-bucket"
 
-# [vars] 移除明文密碼，改用 wrangler secret put
-# PURGE_SECRET - 用 wrangler secret put PURGE_SECRET 設定
-# SYNC_SECRET_KEY - 用 wrangler secret put SYNC_SECRET_KEY 設定
+# [vars] 臨時測試用 - 生產環境應該用 wrangler secret put
+[vars]
+SYNC_SECRET_KEY = "Lui@63006021"
 
