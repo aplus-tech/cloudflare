@@ -31,15 +31,18 @@ priority_docs:
 
 # 當前狀態追蹤（AI 自動識別用）
 current_status:
-  last_confirmed: "2026-01-18"
+  last_confirmed: "2026-01-19"
   confirmed_by: "user"
   current_focus:
-    phase: "4.7"
-    task: "Task 4.7.6 - Cache Warming 實作"
-    next_step: "建立 /api/warm-cache/+server.ts endpoint"
-    user_note: "用戶確認使用 Solution 1 (Sitemap Crawler)"
+    phase: "5.0"
+    task: "VPS 遷移與 AI 自動化整合"
+    next_step: "Phase A - VPS 遷移準備（DNS + Docker 遷移）"
+    user_note: "完整 5-phase 計劃詳見 .ai/IDEAS.md#Phase-5-8-Overview"
 
-  on_hold_tasks: []
+  on_hold_tasks:
+    - phase: "4.7"
+      task: "安全與效能優化（Cache Warming + 移除明文密碼）"
+      reason: "Phase 5.0 VPS 遷移優先，Phase 4.7 將在新 VPS 環境完成"
 
 # 代碼風格
 code_style:

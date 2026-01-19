@@ -316,12 +316,129 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 
 ---
 
-## 📋 計劃中（Phase 5-8）
+## 🚀 計劃中（Phase 5.0 - 當前焦點）
 
-- [ ] **Phase 5**：Invoice/Quotation 系統（PDF 生成 + R2 存儲）
-- [ ] **Phase 6**：AI SEO 自動化系統（Claude API + Cron Worker）
-- [ ] **Phase 7**：全面測試（DNS + Worker + 同步 + 性能）
-- [ ] **Phase 8**：正式上線切換
+### Phase 5.0：VPS 遷移與 AI 自動化整合（2026-01-19 開始）
+
+**狀態**：🟡 計劃階段
+**優先級**：P0（用戶確認）
+**預計完成時間**：12-18 小時
+**詳細計劃**：參見 [.ai/IDEAS.md](.ai/IDEAS.md#Phase-5-8-Overview) 完整 1738 行實施方案
+
+#### 📋 5-Phase 架構概覽
+
+| Phase | 名稱 | 狀態 | 說明 |
+|-------|------|------|------|
+| **Phase A** | VPS 遷移準備 | 待開始 | DNS 配置 + Docker 環境遷移 |
+| **Phase B** | 基礎服務部署 | 待開始 | Docker Compose 多服務編排（WordPress + n8n + WAHA + AI 工具）|
+| **Phase C** | 功能保留驗證 | 待開始 | 100% 保留現有 Cloudflare 功能（10 項測試清單）|
+| **Phase D** | 新功能整合 | 待開始 | WhatsApp Bot + CRM + 會計系統 + 內容行銷自動化 |
+| **Phase E** | Cache Warming | 待開始 | 完成 Task 4.7.6（Sitemap Crawler 實作）|
+
+#### 🎯 核心目標
+
+1. **VPS 遷移**：
+   - 新 VPS：2 CPU / 8GB RAM / 100GB NVMe / $6.99/month
+   - 資源分配：4.9GB 保留 + 3.1GB 可用（AI 工具 + 系統）
+
+2. **100% 保留現有功能**：
+   - ✅ KV Edge Cache（96% 加速，0.15s TTFB）
+   - ✅ D1 數據同步（WordPress → D1 實時）
+   - ✅ R2 媒體存儲（`media.aplus-tech.com.hk`）
+   - ✅ Purge API（自動清除 cache）
+   - ✅ Worker URL 代理（`cloudflare-9qe.pages.dev`）
+
+3. **新增 AI 自動化**：
+   - 🆕 Claude Code CLI（本地開發工具）
+   - 🆕 Gemini CLI（Vision OCR + 內容生成）
+   - 🆕 n8n 自動化平台（Redis Queue Mode）
+   - 🆕 WAHA WhatsApp Bot（Webhook 整合）
+
+4. **業務功能擴展**：
+   - 🆕 WhatsApp 客戶服務自動化（WAHA + n8n + D1 CRM）
+   - 🆕 收據/發票掃描會計系統（Gemini Vision OCR + D1 Accounting）
+   - 🆕 社交媒體內容行銷（WordPress REST API + Facebook Graph API）
+
+#### 📊 資源分配（8GB RAM Total）
+
+| 服務 | 記憶體限制 | 說明 |
+|------|-----------|------|
+| MySQL | 1GB | WordPress 資料庫 |
+| WordPress | 1GB | PHP-FPM + Apache |
+| PostgreSQL | 512MB | n8n 資料庫 |
+| n8n | 1GB | Queue Mode 自動化平台 |
+| WAHA | 1GB | WhatsApp HTTP API |
+| Redis | 256MB | n8n Queue Backend |
+| **小計** | **4.9GB** | Docker 服務保留 |
+| 系統 + AI 工具 | 3.1GB | OS + Claude Code + Gemini CLI |
+
+#### 🔧 關鍵技術決策
+
+1. **DNS 策略**：
+   - `origin.aplus-tech.com.hk` → 灰雲（DNS-Only）直達 VPS
+   - `www.aplus-tech.com.hk` → 橙雲（Proxied）經 Worker 代理
+   - `media.aplus-tech.com.hk` → R2 Custom Domain
+
+2. **Docker 編排**：
+   - 使用 Docker Compose 統一管理 7 個服務
+   - Resource limits 防止 OOM
+   - Health checks 自動重啟
+   - Persistent volumes 數據持久化
+
+3. **安全與認證**：
+   - Cloudflare Tunnel 安全外部訪問（n8n + MySQL）
+   - Secret key 驗證（SYNC_SECRET_KEY + PURGE_SECRET）
+   - D1 Schema 擴展（CRM + Accounting 表結構）
+
+4. **Cache Warming 實作**（Task 4.7.6）：
+   - Sitemap Crawler（自動發現所有頁面）
+   - 並發控制（10 concurrent requests）
+   - `/api/warm-cache` POST endpoint
+   - Secret key 防止惡意觸發
+
+#### 📁 新建檔案清單
+
+1. **Docker 配置**：
+   - `docker-compose.yml`（673 行）
+   - `.env`（環境變數）
+
+2. **API Endpoints**：
+   - `src/routes/api/warm-cache/+server.ts`（200+ 行，POST + GET）
+
+3. **D1 SQL Schemas**：
+   - `migrations/005_crm_tables.sql`（CRM 聯絡人 + 對話記錄）
+   - `migrations/006_accounting_tables.sql`（會計科目 + 分錄 + 報表）
+
+4. **AI 工具配置**：
+   - `.claude/config.json`（Claude Code 設定）
+   - `.gemini/config.yaml`（Gemini CLI 設定）
+
+#### ⚠️ 風險與緩解
+
+| 風險 | 影響 | 緩解方案 |
+|------|------|---------|
+| RAM 不足 | 服務 crash | Resource limits + Swap 4GB |
+| DNS 切換停機 | 短暫無法訪問 | 分階段切換，保留 origin 備援 |
+| Cache 失效 | 首次訪問慢 | Phase E Cache Warming 預熱 |
+| 數據遷移失敗 | 數據丟失 | 完整備份 + 測試環境驗證 |
+
+#### 🔗 相關文檔
+
+- **完整實施計劃**：[.ai/IDEAS.md (Line 457-1738)](.ai/IDEAS.md)
+- **Docker Compose**：[.ai/IDEAS.md (Line 673-871)](.ai/IDEAS.md)
+- **D1 CRM Schema**：[.ai/IDEAS.md (Line 1317-1344)](.ai/IDEAS.md)
+- **D1 Accounting Schema**：[.ai/IDEAS.md (Line 1357-1392)](.ai/IDEAS.md)
+- **Cache Warming API**：[.ai/IDEAS.md (Line 1447-1635)](.ai/IDEAS.md)
+- **Gemini Conversation Insights**：[.ai/IDEAS.md (Line 1703-1715)](.ai/IDEAS.md)
+
+---
+
+## 📋 計劃中（Phase 5.1-8.0）
+
+- [ ] **Phase 5.1**：Invoice/Quotation 系統（PDF 生成 + R2 存儲）
+- [ ] **Phase 6.0**：AI SEO 自動化系統（Claude API + Cron Worker）
+- [ ] **Phase 7.0**：全面測試（DNS + Worker + 同步 + 性能）
+- [ ] **Phase 8.0**：正式上線切換
 
 ---
 

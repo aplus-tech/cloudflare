@@ -419,3 +419,1320 @@ Day 5：全面測試（同步 + 清除 + 效能）
 **分析完成時間**：2025-01-10
 **分析模型**：Claude Opus 4
 **分析模式**：READ-ONLY（僅分析，不修改代碼）
+
+---
+
+## 🚀 未來規劃：Phase 5-8（來自 PROGRESS.md）
+
+**最後更新**：2026-01-19
+**狀態**：構思階段
+
+### Phase 5：VPS 遷移與 AI 自動化整合
+
+**詳細計劃**：見下文「2026-01-19：VPS 遷移與 AI 整合計劃」
+
+### Phase 6：AI SEO 自動化系統
+
+**目標**：Claude API + Cron Worker 自動生成 SEO 內容
+- 自動改寫產品描述
+- Meta tags 優化
+- Schema.org 標記生成
+
+### Phase 7：全面測試
+
+**目標**：DNS + Worker + 同步 + 性能全面驗證
+- 生產環境 DNS 切換測試
+- 負載測試（模擬高流量）
+- 數據一致性驗證
+
+### Phase 8：正式上線切換
+
+**目標**：生產環境遷移
+- 主域名 DNS 切換
+- 監控系統部署
+- 回滾方案準備
+
+---
+
+## 💡 2026-01-19：VPS 遷移與 AI 整合計劃
+
+**提出日期**：2026-01-19
+**規劃模型**：Claude Opus 4.5
+**狀態**：計劃階段（用戶已確認方向）
+**優先級**：P0
+
+### 📋 計劃概要
+
+**目標**：
+1. 遷移到新 VPS（2 CPU / 8GB RAM / 100GB NVMe / $6.99/月）
+2. 安裝 AI 工具（Claude Code + Gemini CLI）
+3. 部署自動化平台（n8n + WAHA WhatsApp Bot）
+4. **100% 保留現有 Cloudflare 功能**（Workers, KV, D1, R2）
+5. 新增業務自動化（WhatsApp Bot, 會計系統, 內容行銷）
+6. 完成 Task 4.7.6（Cache Warming）
+
+**資源分配**（8GB RAM 足夠）：
+- WordPress + MySQL: 1.5GB
+- n8n + PostgreSQL: 1.5GB
+- WAHA (WhatsApp Bot): 1GB
+- Redis: 256MB
+- AI Tools (on-demand): 1GB+
+- 系統預留: 2GB+
+
+**預計時間**：12-18 小時（分 5 階段執行）
+
+---
+
+### 🎯 Phase A：VPS 遷移準備（2-3 小時）
+
+#### A.1 新 VPS 規格
+
+| 項目 | 規格 |
+|------|------|
+| CPU | 2 cores |
+| RAM | 8GB |
+| Storage | 100GB NVMe |
+| 成本 | $6.99/month |
+| 用途 | WordPress + AI Tools + n8n + WAHA |
+
+---
+
+#### A.2 Cloudflare DNS 設定步驟（關鍵）
+
+**【問題原因】**
+遷移 VPS 需要更新 DNS 設定，確保流量正確指向新伺服器，同時保持 Cloudflare Worker 正常運作。
+
+**【方案成立】**
+採用灰雲（DNS-Only）子域名策略，避免 redirect loop。
+
+**【來源證據】**
+- PROGRESS.md:66-77（方案 C 成功解決 redirect loop）
+- hooks.server.ts:6（`ORIGIN = 'http://origin.aplus-tech.com.hk'`）
+
+##### 步驟 1：登入 Cloudflare Dashboard
+```
+1. 訪問 https://dash.cloudflare.com
+2. 選擇 aplus-tech.com.hk 域名
+3. 進入 DNS → Records
+```
+
+##### 步驟 2：修改現有 DNS Records
+
+**必須修改嘅 Records：**
+
+| Type | Name | Content（舊 VPS） | Content（新 VPS） | Proxy Status |
+|------|------|------------------|------------------|--------------|
+| A | origin | 15.235.199.194 | [NEW_VPS_IP] | DNS Only (灰雲) |
+| A | test | 15.235.199.194 | [NEW_VPS_IP] | Proxied (橙雲) |
+
+**保持不變嘅 Records：**
+
+| Type | Name | Content | Proxy Status | 說明 |
+|------|------|---------|--------------|------|
+| A | @ | [指向 Worker] | Proxied (橙雲) | 主域名走 Worker |
+| CNAME | media | [R2 endpoint] | Proxied (橙雲) | R2 媒體 |
+| CNAME | www | aplus-tech.com.hk | Proxied (橙雲) | WWW redirect |
+
+##### 步驟 3：驗證 DNS 生效
+```bash
+# 檢查 origin 子域名（應該返回新 VPS IP）
+nslookup origin.aplus-tech.com.hk
+
+# 檢查測試域名
+nslookup test.aplus-tech.com.hk
+
+# 檢查主域名（應該返回 Cloudflare IP，唔係 VPS IP）
+nslookup aplus-tech.com.hk
+```
+
+##### 步驟 4：驗證 Cloudflare Worker 連接
+```bash
+# 測試 Worker 可以連接新 VPS
+curl -I https://test.aplus-tech.com.hk/
+# 應該返回 200 OK，有 X-Cache header
+
+# 測試 origin 直連
+curl -I http://origin.aplus-tech.com.hk/
+# 應該返回 WordPress 原始 HTML
+```
+
+---
+
+#### A.3 WordPress Docker 遷移程序
+
+##### 步驟 1：舊 VPS 備份
+
+```bash
+# SSH 登入舊 VPS
+ssh root@15.235.199.194
+
+# 備份 WordPress 檔案
+cd /var/www
+tar -czvf wordpress_backup_$(date +%Y%m%d).tar.gz wordpress/
+
+# 備份 MySQL 數據庫
+docker exec mysql_container mysqldump -u root -p wordpress > wordpress_db_$(date +%Y%m%d).sql
+
+# 備份 Docker volumes（如果用 Docker）
+docker run --rm -v wordpress_data:/data -v $(pwd):/backup alpine tar czvf /backup/wordpress_volumes.tar.gz /data
+
+# 傳輸到新 VPS
+scp wordpress_backup_*.tar.gz root@[NEW_VPS_IP]:/root/backups/
+scp wordpress_db_*.sql root@[NEW_VPS_IP]:/root/backups/
+```
+
+##### 步驟 2：新 VPS 基礎設定
+
+```bash
+# SSH 登入新 VPS
+ssh root@[NEW_VPS_IP]
+
+# 更新系統
+apt update && apt upgrade -y
+
+# 安裝 Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# 安裝 Docker Compose
+apt install docker-compose-plugin -y
+
+# 驗證安裝
+docker --version
+docker compose version
+```
+
+##### 步驟 3：恢復 WordPress
+
+```bash
+# 創建目錄結構
+mkdir -p /var/www/wordpress
+mkdir -p /opt/docker/wordpress
+
+# 解壓備份
+cd /root/backups
+tar -xzvf wordpress_backup_*.tar.gz -C /var/www/
+
+# 創建 WordPress Docker Compose
+# 見下文 B.1 完整配置
+```
+
+---
+
+#### A.4 備份同回滾策略
+
+##### 備份清單（遷移前）
+```bash
+# 1. WordPress 數據
+/var/www/wordpress/wp-content/
+/var/www/wordpress/wp-config.php
+
+# 2. MySQL 數據庫
+wordpress database (完整 dump)
+
+# 3. WordPress Plugin 配置
+wp-d1-sync.php (D1_API_URL, SYNC_SECRET_KEY)
+wp-cache-purge.php (purge_url, secret_key)
+
+# 4. Cloudflare 設定截圖
+DNS Records
+Worker 設定
+KV/D1/R2 bindings
+```
+
+##### 回滾步驟（如有需要）
+```bash
+# 步驟 1：DNS 切換回舊 VPS
+# Cloudflare Dashboard → DNS → 修改 origin A record 回 15.235.199.194
+
+# 步驟 2：驗證舊 VPS 仍然運作
+curl -I http://15.235.199.194/
+
+# 步驟 3：清空 KV Cache（避免舊數據）
+curl "https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021"
+```
+
+---
+
+### 🛠️ Phase B：基礎服務架設（3-4 小時）
+
+#### B.1 Docker Compose 架構設計
+
+**【問題原因】**
+需要喺 8GB RAM 內運行多個服務：WordPress、n8n、WAHA、Redis、PostgreSQL。
+
+**【方案成立】**
+使用 Docker Compose 統一管理，合理分配資源限制。
+
+**【來源證據】**
+- Gemini 對話：n8n + PostgreSQL 配置
+- WAHA 官方文檔：https://github.com/devlikeapro/waha
+
+##### 完整 docker-compose.yml
+
+```yaml
+# 檔案位置：/opt/docker/docker-compose.yml
+# 資源分配：8GB RAM 總計
+
+version: '3.8'
+
+services:
+  # ============================================
+  # WordPress + MySQL（現有服務）
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  wordpress:
+    image: wordpress:6-php8.1-apache
+    container_name: wordpress
+    restart: always
+    depends_on:
+      - mysql
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wordpress-plugins:/var/www/html/wp-content/plugins/custom
+    ports:
+      - "80:80"
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ============================================
+  # n8n 自動化平台 + PostgreSQL
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: n8n
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      # Database
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Queue Mode (用於 WAHA webhook)
+      EXECUTIONS_MODE: queue
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_BULL_REDIS_PORT: 6379
+      # Webhook URL
+      WEBHOOK_URL: https://n8n.aplus-tech.com.hk/
+      # Timezone
+      GENERIC_TIMEZONE: Asia/Hong_Kong
+      TZ: Asia/Hong_Kong
+      # 加密 Key（務必更改）
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    ports:
+      - "5678:5678"
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ============================================
+  # WAHA (WhatsApp HTTP API)
+  # ============================================
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha
+    restart: always
+    environment:
+      # API Key（務必更改）
+      WHATSAPP_API_KEY: ${WAHA_API_KEY}
+      # Webhook 設定（指向 n8n）
+      WHATSAPP_HOOK_URL: http://n8n:5678/webhook/waha
+      WHATSAPP_HOOK_EVENTS: "message,message.ack,session.status"
+      # Session 存儲
+      WHATSAPP_SESSIONS_START: "true"
+    volumes:
+      - waha_data:/app/.sessions
+    ports:
+      - "3000:3000"
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ============================================
+  # Redis（用於 n8n Queue + WAHA）
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ============================================
+  # Nginx Reverse Proxy（可選）
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "443:443"
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  mysql_data:
+  wordpress_data:
+  postgres_data:
+  n8n_data:
+  waha_data:
+  redis_data:
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  app_network:
+    driver: bridge
+```
+
+##### 環境變數檔案 .env
+
+```bash
+# 檔案位置：/opt/docker/.env
+# 安全提示：務必修改所有密碼！
+
+# MySQL
+MYSQL_ROOT_PASSWORD=your_strong_mysql_root_password
+MYSQL_PASSWORD=your_strong_mysql_password
+
+# PostgreSQL (n8n)
+POSTGRES_PASSWORD=your_strong_postgres_password
+
+# n8n
+N8N_ENCRYPTION_KEY=your_random_32_char_encryption_key
+
+# WAHA
+WAHA_API_KEY=your_waha_api_key
+```
+
+##### 資源分配總覽
+
+| Service | Memory Limit | Memory Reserved | 備註 |
+|---------|--------------|-----------------|------|
+| MySQL | 1GB | 512MB | WordPress 數據庫 |
+| WordPress | 1GB | 512MB | PHP + Apache |
+| PostgreSQL | 512MB | 256MB | n8n 數據庫 |
+| n8n | 1GB | 512MB | 自動化引擎 |
+| WAHA | 1GB | 512MB | WhatsApp Bot |
+| Redis | 256MB | 128MB | Queue + Cache |
+| Nginx | 128MB | 64MB | Reverse Proxy |
+| **總計** | **4.9GB** | **2.5GB** | 預留 3GB 給 OS + AI Tools |
+
+---
+
+#### B.2 Claude Code 安裝步驟
+
+**【問題原因】**
+需要喺 VPS 安裝 Claude Code CLI 進行開發同自動化。
+
+**【方案成立】**
+Claude Code 係 Node.js 應用，透過 npm 安裝。
+
+##### 步驟 1：安裝 Node.js
+
+```bash
+# 安裝 Node.js 20 LTS
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+
+# 驗證版本
+node --version  # v20.x
+npm --version   # 10.x
+```
+
+##### 步驟 2：安裝 Claude Code
+
+```bash
+# 全局安裝 Claude Code
+npm install -g @anthropic-ai/claude-code
+
+# 驗證安裝
+claude --version
+
+# 設定 API Key
+export ANTHROPIC_API_KEY="sk-ant-your-api-key"
+
+# 加入 bashrc（永久生效）
+echo 'export ANTHROPIC_API_KEY="sk-ant-your-api-key"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+##### 步驟 3：驗證功能
+
+```bash
+# 測試 Claude Code
+claude "Hello, can you help me with coding?"
+
+# 測試喺項目目錄
+cd /opt/docker
+claude "Explain this docker-compose.yml file"
+```
+
+---
+
+#### B.3 Gemini CLI 安裝步驟
+
+**【問題原因】**
+Gemini 2.5 Pro 有 200M+ token context，適合處理大量文檔、圖片分析。
+
+**【方案成立】**
+Gemini CLI 透過 Google Cloud SDK 安裝。
+
+##### 步驟 1：安裝 Google Cloud SDK
+
+```bash
+# 安裝依賴
+apt install -y apt-transport-https ca-certificates gnupg
+
+# 加入 Google Cloud repository
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list
+
+# 安裝 SDK
+apt update && apt install -y google-cloud-cli
+```
+
+##### 步驟 2：設定 Gemini API
+
+```bash
+# 方法 A：使用 Google AI Studio API Key（推薦）
+export GOOGLE_AI_API_KEY="your-gemini-api-key"
+echo 'export GOOGLE_AI_API_KEY="your-gemini-api-key"' >> ~/.bashrc
+
+# 方法 B：使用 Service Account（企業用）
+gcloud auth application-default login
+```
+
+##### 步驟 3：安裝 Gemini CLI 工具
+
+```bash
+# 使用官方 genai-cli
+pip3 install google-generativeai
+
+# 測試 API
+python3 -c "
+import google.generativeai as genai
+genai.configure(api_key='$GOOGLE_AI_API_KEY')
+model = genai.GenerativeModel('gemini-2.0-flash')
+response = model.generate_content('Hello!')
+print(response.text)
+"
+```
+
+---
+
+#### B.4 n8n + PostgreSQL 部署
+
+##### 步驟 1：啟動 n8n 服務
+
+```bash
+cd /opt/docker
+docker compose up -d postgres redis n8n
+
+# 檢查服務狀態
+docker compose ps
+docker logs n8n
+```
+
+##### 步驟 2：設定 Cloudflare Tunnel（可選，用於外部訪問）
+
+```bash
+# 安裝 cloudflared
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
+dpkg -i cloudflared.deb
+
+# 登入 Cloudflare
+cloudflared tunnel login
+
+# 創建 Tunnel
+cloudflared tunnel create n8n-tunnel
+
+# 設定路由
+cloudflared tunnel route dns n8n-tunnel n8n.aplus-tech.com.hk
+
+# 創建配置檔
+cat > /etc/cloudflared/config.yml << 'EOF'
+tunnel: n8n-tunnel
+credentials-file: /root/.cloudflared/<tunnel-id>.json
+
+ingress:
+  - hostname: n8n.aplus-tech.com.hk
+    service: http://localhost:5678
+  - service: http_status:404
+EOF
+
+# 啟動 Tunnel
+cloudflared tunnel run n8n-tunnel
+
+# 設為系統服務
+cloudflared service install
+systemctl enable cloudflared
+systemctl start cloudflared
+```
+
+##### 步驟 3：n8n 初始設定
+
+```
+1. 訪問 https://n8n.aplus-tech.com.hk
+2. 創建管理員帳號
+3. 設定 Credentials：
+   - Cloudflare API Token
+   - Google API (Gemini + Contacts)
+   - Facebook Graph API
+   - WhatsApp (WAHA webhook)
+```
+
+---
+
+#### B.5 WAHA (WhatsApp Bot) Docker 設定
+
+##### 步驟 1：啟動 WAHA 服務
+
+```bash
+cd /opt/docker
+docker compose up -d waha
+
+# 檢查服務狀態
+docker logs waha
+```
+
+##### 步驟 2：連接 WhatsApp
+
+```bash
+# 獲取 QR Code
+curl http://localhost:3000/api/sessions/default/auth/qr
+
+# 或者訪問 Web UI（如果有）
+# http://localhost:3000/
+```
+
+##### 步驟 3：設定 Webhook 到 n8n
+
+```bash
+# WAHA 會自動將訊息發送到 n8n webhook
+# 在 docker-compose.yml 已設定：
+# WHATSAPP_HOOK_URL: http://n8n:5678/webhook/waha
+# WHATSAPP_HOOK_EVENTS: "message,message.ack,session.status"
+```
+
+---
+
+#### B.6 Redis Cache 設定
+
+```bash
+# Redis 已在 docker-compose.yml 設定
+# 主要用途：
+# 1. n8n Queue Mode（處理大量 webhook）
+# 2. Session Cache（WAHA sessions）
+# 3. 可選：WordPress Object Cache
+
+# 驗證 Redis 運行
+docker exec redis redis-cli ping
+# 應返回 PONG
+```
+
+---
+
+### ✅ Phase C：現有功能保留（1-2 小時）
+
+#### C.1 Cloudflare Workers 持續運作驗證
+
+**【問題原因】**
+遷移 VPS 後，必須確保 Cloudflare Workers 繼續正常運作，唔可以影響現有 96% 加速效能。
+
+**【方案成立】**
+保持 Worker 代碼不變，只更新 origin DNS record。
+
+**【來源證據】**
+- hooks.server.ts:6（`ORIGIN = 'http://origin.aplus-tech.com.hk'`）
+- PROGRESS.md:79-84（KV Cache 測試結果）
+
+##### 驗證步驟清單
+
+```bash
+# 步驟 1：確認 Worker 部署正常
+curl -I https://cloudflare-9qe.pages.dev/
+# 應返回 200 OK
+
+# 步驟 2：測試 KV Cache HIT
+curl -I https://test.aplus-tech.com.hk/
+# 第一次：X-Cache: MISS
+# 第二次：X-Cache: HIT
+
+# 步驟 3：測試靜態資源代理
+curl -I https://test.aplus-tech.com.hk/wp-content/themes/your-theme/style.css
+# 應返回 Content-Type: text/css
+
+# 步驟 4：測試 R2 圖片
+curl -I https://media.aplus-tech.com.hk/products/brand/image.jpg
+# 應返回 200 OK
+```
+
+##### Worker 代碼關鍵位置（無需修改）
+
+```typescript
+// 來源：cloudflare-wordpress/src/hooks.server.ts:6
+const ORIGIN = 'http://origin.aplus-tech.com.hk'; // 灰雲 DNS-Only，直達 VPS
+
+// 只要 origin.aplus-tech.com.hk DNS 指向新 VPS
+// Worker 會自動 fetch 新 VPS 內容
+```
+
+---
+
+#### C.2 KV Cache 驗證程序
+
+##### 步驟 1：清空現有 Cache
+
+```bash
+# 遷移後清空 KV Cache，確保無舊數據
+curl "https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021"
+
+# 應返回：
+# {"success":true,"message":"Successfully deleted XX items from cache."}
+```
+
+##### 步驟 2：效能測試
+
+```bash
+# 首次訪問（無 Cache）
+curl -w "Time: %{time_total}s\n" -o /dev/null -s https://test.aplus-tech.com.hk/
+# 預期：2-4 秒
+
+# 二次訪問（有 Cache）
+curl -w "Time: %{time_total}s\n" -o /dev/null -s https://test.aplus-tech.com.hk/
+# 預期：< 0.2 秒（96% 加速）
+```
+
+##### 步驟 3：驗證 Cache Key 格式
+
+```bash
+# 列出 KV Cache keys
+npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491
+
+# 應該睇到類似：
+# [{"name":"html:/","expiration":...}, {"name":"html:/shop/","expiration":...}]
+```
+
+---
+
+#### C.3 D1 Database 同步驗證
+
+##### 步驟 1：測試產品同步
+
+```bash
+# 在 WordPress 更新任意產品
+# 檢查 D1 記錄
+
+npx wrangler d1 execute wordpress-cloudflare \
+  --command="SELECT id, title, updated_at FROM sync_products ORDER BY updated_at DESC LIMIT 5"
+
+# 應該睇到最新更新嘅產品
+```
+
+##### 步驟 2：驗證 API 認證
+
+```bash
+# 測試 Sync API
+curl -X POST https://cloudflare-9qe.pages.dev/api/sync \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "product",
+    "secret": "Lui@63006021",
+    "payload": {
+      "id": 9999,
+      "title": "Test Product",
+      "sku": "TEST-001"
+    }
+  }'
+
+# 應返回：{"success":true,"message":"Sync completed",...}
+
+# 清理測試數據
+npx wrangler d1 execute wordpress-cloudflare \
+  --command="DELETE FROM sync_products WHERE id = 9999"
+```
+
+---
+
+#### C.4 R2 媒體存儲連接測試
+
+##### 步驟 1：驗證現有圖片可訪問
+
+```bash
+# 從 D1 獲取圖片路徑
+npx wrangler d1 execute wordpress-cloudflare \
+  --command="SELECT original_url, r2_path FROM media_mapping LIMIT 5"
+
+# 測試 R2 URL
+curl -I https://media.aplus-tech.com.hk/products/brand-name/image.jpg
+# 應返回 200 OK
+```
+
+##### 步驟 2：測試新圖片上傳
+
+```bash
+# 在 WordPress 上傳新圖片到產品
+# 檢查 D1 media_mapping
+
+npx wrangler d1 execute wordpress-cloudflare \
+  --command="SELECT * FROM media_mapping ORDER BY id DESC LIMIT 1"
+
+# 驗證 R2 圖片可訪問
+curl -I https://media.aplus-tech.com.hk/[r2_path_from_above]
+```
+
+---
+
+#### C.5 完整功能測試清單
+
+| 功能 | 測試方法 | 預期結果 | 實際結果 |
+|------|---------|---------|---------|
+| KV Cache HIT | `curl -I` 兩次 | 第二次 X-Cache: HIT | [ ] |
+| 效能加速 | `curl -w` 測時間 | 從 3s+ 到 0.15s | [ ] |
+| D1 產品同步 | WordPress 更新 → D1 查詢 | < 1 秒內同步 | [ ] |
+| D1 文章同步 | WordPress 發布 → D1 查詢 | 記錄存在 | [ ] |
+| R2 圖片上傳 | 上傳產品圖 | media_mapping 有記錄 | [ ] |
+| R2 圖片訪問 | `curl` R2 URL | 200 OK | [ ] |
+| Purge 單頁 | 更新產品 → 檢查 KV | 對應 key 被刪除 | [ ] |
+| Purge 全部 | 調用 purge-all API | 所有 key 被刪除 | [ ] |
+| Admin 繞過 | 訪問 /wp-admin/ | Redirect 到 origin | [ ] |
+| 登入繞過 | 帶 cookie 訪問 | 無 KV Cache | [ ] |
+
+---
+
+### 🚀 Phase D：新功能整合（4-6 小時）
+
+#### D.1 WhatsApp Bot 設定（WAHA + n8n + D1 CRM）
+
+**【問題原因】**
+需要自動化客戶服務：接收 WhatsApp 訊息 → 自動回覆 / 報價 / CRM 記錄。
+
+**【方案成立】**
+WAHA 接收訊息 → n8n 處理邏輯 → D1 存儲客戶數據。
+
+##### 架構圖
+
+```
+WhatsApp 客戶訊息
+    ↓
+WAHA (Docker :3000)
+    ↓ webhook
+n8n Workflow
+    ├─ 關鍵詞識別（報價/查詢/投訴）
+    ├─ 自動回覆模板
+    ├─ 記錄到 D1 (customers table)
+    └─ 通知管理員
+    ↓
+WhatsApp 自動回覆
+```
+
+##### D1 CRM Schema 擴展
+
+```sql
+-- 新增 CRM 表（需要執行）
+CREATE TABLE crm_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT UNIQUE,
+    name TEXT,
+    company TEXT,
+    email TEXT,
+    source TEXT DEFAULT 'whatsapp',
+    last_message TEXT,
+    last_intent TEXT,
+    total_enquiries INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_crm_phone ON crm_contacts(phone);
+
+CREATE TABLE crm_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id INTEGER,
+    direction TEXT, -- 'inbound' or 'outbound'
+    message TEXT,
+    intent TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (contact_id) REFERENCES crm_contacts(id)
+);
+CREATE INDEX idx_crm_conv_contact ON crm_conversations(contact_id);
+```
+
+---
+
+#### D.2 會計自動化（Gemini Vision OCR → D1 → iXBRL）
+
+**【問題原因】**
+需要自動化處理發票/收據：OCR 識別 → D1 記錄 → 生成 P&L / Balance Sheet。
+
+**【方案成立】**
+Gemini 2.5 Pro Vision 有強大 OCR 能力，配合 n8n 自動化流程。
+
+##### D1 Accounting Schema
+
+```sql
+-- 會計科目表
+CREATE TABLE accounting_chart (
+    code TEXT PRIMARY KEY,
+    name_zh TEXT,
+    name_en TEXT,
+    type TEXT, -- 'asset', 'liability', 'equity', 'revenue', 'expense'
+    parent_code TEXT
+);
+
+-- 會計分錄表
+CREATE TABLE accounting_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, -- YYYY-MM-DD
+    doc_type TEXT, -- 'invoice', 'receipt', 'payment', 'journal'
+    doc_number TEXT,
+    description TEXT,
+    debit_account TEXT,
+    credit_account TEXT,
+    amount REAL,
+    currency TEXT DEFAULT 'HKD',
+    source_file TEXT, -- R2 path
+    ocr_raw TEXT, -- Gemini OCR 原始結果
+    verified BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (debit_account) REFERENCES accounting_chart(code),
+    FOREIGN KEY (credit_account) REFERENCES accounting_chart(code)
+);
+CREATE INDEX idx_acc_date ON accounting_entries(date);
+CREATE INDEX idx_acc_type ON accounting_entries(doc_type);
+
+-- 報表暫存表
+CREATE TABLE accounting_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_type TEXT, -- 'pnl', 'balance_sheet', 'cash_flow'
+    period_start TEXT,
+    period_end TEXT,
+    data_json TEXT, -- 報表數據 JSON
+    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+#### D.3 內容行銷自動化（Crawler → WordPress → Social Media）
+
+**【問題原因】**
+需要自動化內容生產：爬取供應商資料 → AI 改寫 → 發布 WordPress → 同步社交媒體。
+
+**【方案成立】**
+n8n 編排整個流程，使用 Claude/Gemini 改寫內容。
+
+##### 架構圖
+
+```
+定時 Cron (每日)
+    ↓
+n8n: 爬取供應商網站
+    ↓
+Claude API: 改寫內容（SEO 優化）
+    ↓
+WordPress REST API: 發布文章
+    ↓
+Facebook Graph API: 發布帖文
+    ↓
+Instagram API: 發布帖文
+```
+
+---
+
+### 🧪 Phase E：Task 4.7.6 完成同測試（2-3 小時）
+
+#### E.1 Cache Warming API Endpoint 實作
+
+**【問題原因】**
+現時 KV Cache 係被動式：只有用戶訪問先會 cache。首次訪問需要 3.59s，影響用戶體驗。
+
+**【方案成立】**
+使用 Sitemap Crawler 方案：
+- WordPress 自動生成 Sitemap（`/wp-sitemap.xml`）
+- 建立 `/api/warm-cache` endpoint 批量預熱
+- 並發控制 10 concurrent requests
+
+**【來源證據】**
+- PROGRESS.md:253-300（詳細技術方案）
+- task.md:226-297（Task 4.7.6 步驟）
+
+##### 完整代碼設計
+
+```typescript
+// 檔案位置：cloudflare-wordpress/src/routes/api/warm-cache/+server.ts
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+
+// 並發控制函數
+async function fetchWithConcurrency<T>(
+  urls: string[],
+  maxConcurrent: number,
+  fetchFn: (url: string) => Promise<T>
+): Promise<T[]> {
+  const results: T[] = [];
+  const inProgress: Promise<void>[] = [];
+
+  for (const url of urls) {
+    const promise = (async () => {
+      const result = await fetchFn(url);
+      results.push(result);
+    })();
+
+    inProgress.push(promise);
+
+    if (inProgress.length >= maxConcurrent) {
+      await Promise.race(inProgress);
+      // 移除已完成嘅 promise
+      const completed = await Promise.race(inProgress.map((p, i) => p.then(() => i)));
+      inProgress.splice(completed, 1);
+    }
+  }
+
+  await Promise.all(inProgress);
+  return results;
+}
+
+// 解析 WordPress Sitemap XML
+async function parseSitemapXML(xml: string): Promise<string[]> {
+  const urls: string[] = [];
+
+  // 檢查係咪 sitemap index（包含多個 sitemap）
+  const sitemapIndexRegex = /<sitemap>\s*<loc>(.*?)<\/loc>/g;
+  let match;
+
+  while ((match = sitemapIndexRegex.exec(xml)) !== null) {
+    // 遞歸 fetch 子 sitemap
+    const subSitemapUrl = match[1];
+    try {
+      const subResponse = await fetch(subSitemapUrl);
+      const subXml = await subResponse.text();
+      const subUrls = await parseSingleSitemap(subXml);
+      urls.push(...subUrls);
+    } catch (e) {
+      console.error(`Failed to fetch sub-sitemap: ${subSitemapUrl}`, e);
+    }
+  }
+
+  // 如果冇 sitemap index，直接解析 URL
+  if (urls.length === 0) {
+    const directUrls = await parseSingleSitemap(xml);
+    urls.push(...directUrls);
+  }
+
+  return urls;
+}
+
+// 解析單個 sitemap 嘅 URL
+async function parseSingleSitemap(xml: string): Promise<string[]> {
+  const urls: string[] = [];
+  const urlRegex = /<url>\s*<loc>(.*?)<\/loc>/g;
+  let match;
+
+  while ((match = urlRegex.exec(xml)) !== null) {
+    urls.push(match[1]);
+  }
+
+  return urls;
+}
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  try {
+    const { secret } = await request.json();
+
+    // 1. 驗證 Secret Key
+    const expectedSecret = platform?.env.PURGE_SECRET;
+    if (!expectedSecret || secret !== expectedSecret) {
+      return json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Fetch WordPress Sitemap
+    const sitemapUrl = 'http://origin.aplus-tech.com.hk/wp-sitemap.xml';
+    console.log(`[Cache Warm] Fetching sitemap: ${sitemapUrl}`);
+
+    const sitemapResponse = await fetch(sitemapUrl);
+    if (!sitemapResponse.ok) {
+      return json({
+        error: 'Failed to fetch sitemap',
+        status: sitemapResponse.status
+      }, { status: 500 });
+    }
+
+    const sitemapXml = await sitemapResponse.text();
+
+    // 3. 解析 XML 提取 URLs
+    const urls = await parseSitemapXML(sitemapXml);
+    console.log(`[Cache Warm] Found ${urls.length} URLs to warm`);
+
+    if (urls.length === 0) {
+      return json({
+        success: false,
+        message: 'No URLs found in sitemap',
+        sitemap_url: sitemapUrl
+      });
+    }
+
+    // 4. 批量 fetch URLs 觸發 KV Cache（並發控制）
+    const maxConcurrent = 10;
+    const results: { url: string; status: string; time: number }[] = [];
+    const startTime = Date.now();
+
+    await fetchWithConcurrency(urls, maxConcurrent, async (url) => {
+      const urlStartTime = Date.now();
+      try {
+        // 將 origin URL 轉換為經過 Worker 嘅 URL
+        const workerUrl = url
+          .replace('http://origin.aplus-tech.com.hk', 'https://test.aplus-tech.com.hk')
+          .replace('https://origin.aplus-tech.com.hk', 'https://test.aplus-tech.com.hk');
+
+        const response = await fetch(workerUrl, {
+          headers: { 'User-Agent': 'Cache-Warmer/1.0' }
+        });
+
+        results.push({
+          url: workerUrl,
+          status: response.ok ? 'cached' : `error:${response.status}`,
+          time: Date.now() - urlStartTime
+        });
+      } catch (e: any) {
+        results.push({
+          url,
+          status: `error:${e.message}`,
+          time: Date.now() - urlStartTime
+        });
+      }
+    });
+
+    const totalTime = Date.now() - startTime;
+    const successCount = results.filter(r => r.status === 'cached').length;
+    const errorCount = results.filter(r => r.status.startsWith('error')).length;
+
+    console.log(`[Cache Warm] Completed: ${successCount}/${urls.length} cached in ${totalTime}ms`);
+
+    // 5. 返回結果
+    return json({
+      success: true,
+      total_urls: urls.length,
+      cached: successCount,
+      errors: errorCount,
+      total_time_ms: totalTime,
+      avg_time_per_url_ms: Math.round(totalTime / urls.length),
+      details: results // 可選：返回詳細結果
+    });
+
+  } catch (e: any) {
+    console.error('[Cache Warm] Error:', e);
+    return json({ error: e.message }, { status: 500 });
+  }
+};
+
+// GET 方法（方便測試）
+export const GET: RequestHandler = async ({ url, platform }) => {
+  const secret = url.searchParams.get('secret');
+  const expectedSecret = platform?.env.PURGE_SECRET;
+
+  if (!expectedSecret || secret !== expectedSecret) {
+    return json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 返回 sitemap 資訊（不執行 warm）
+  const sitemapUrl = 'http://origin.aplus-tech.com.hk/wp-sitemap.xml';
+  const sitemapResponse = await fetch(sitemapUrl);
+  const sitemapXml = await sitemapResponse.text();
+  const urls = await parseSitemapXML(sitemapXml);
+
+  return json({
+    sitemap_url: sitemapUrl,
+    total_urls: urls.length,
+    sample_urls: urls.slice(0, 10)
+  });
+};
+```
+
+---
+
+#### E.2 測試 Cache Warming
+
+##### 步驟 1：部署代碼
+
+```bash
+cd cloudflare-wordpress
+npm run build
+wrangler pages deploy .svelte-kit/cloudflare
+```
+
+##### 步驟 2：測試 GET（查看 sitemap）
+
+```bash
+curl "https://cloudflare-9qe.pages.dev/api/warm-cache?secret=Lui@63006021"
+
+# 預期返回：
+# {
+#   "sitemap_url": "http://origin.aplus-tech.com.hk/wp-sitemap.xml",
+#   "total_urls": 50,
+#   "sample_urls": ["https://...", ...]
+# }
+```
+
+##### 步驟 3：執行 Warm Cache
+
+```bash
+curl -X POST "https://cloudflare-9qe.pages.dev/api/warm-cache" \
+  -H "Content-Type: application/json" \
+  -d '{"secret": "Lui@63006021"}'
+
+# 預期返回：
+# {
+#   "success": true,
+#   "total_urls": 50,
+#   "cached": 48,
+#   "errors": 2,
+#   "total_time_ms": 15000,
+#   "avg_time_per_url_ms": 300
+# }
+```
+
+---
+
+#### E.3 效能 Benchmarking
+
+##### 測試結果
+
+| 狀態 | TTFB | Total Time | 加速比 |
+|------|------|------------|--------|
+| 無 Cache | ~2.5s | ~3.5s | 1x |
+| 有 Cache | ~0.08s | ~0.15s | 23x |
+| **改善** | **96%** | **96%** | - |
+
+---
+
+### 📊 完整實施時間表
+
+| 階段 | 任務 | 預計時間 | 依賴 |
+|------|------|---------|------|
+| **Phase A** | VPS 遷移準備 | 2-3 小時 | - |
+| A.1 | 新 VPS 基礎設定 | 30 min | - |
+| A.2 | Cloudflare DNS 設定 | 15 min | A.1 |
+| A.3 | WordPress 備份同遷移 | 1-2 小時 | A.2 |
+| A.4 | 驗證同回滾準備 | 30 min | A.3 |
+| **Phase B** | 基礎服務架設 | 3-4 小時 | Phase A |
+| B.1 | Docker Compose 部署 | 30 min | A.1 |
+| B.2 | Claude Code 安裝 | 15 min | B.1 |
+| B.3 | Gemini CLI 安裝 | 15 min | B.1 |
+| B.4 | n8n + PostgreSQL | 1 小時 | B.1 |
+| B.5 | WAHA 設定 | 1 小時 | B.1 |
+| B.6 | Cloudflare Tunnel | 30 min | B.4, B.5 |
+| **Phase C** | 現有功能驗證 | 1-2 小時 | Phase B |
+| C.1-C.5 | 完整功能測試 | 1-2 小時 | B.1 |
+| **Phase D** | 新功能整合 | 4-6 小時 | Phase C |
+| D.1 | WhatsApp Bot | 2 小時 | B.5 |
+| D.2 | 會計自動化 | 2 小時 | B.3, B.4 |
+| D.3 | 內容行銷自動化 | 1 小時 | B.4 |
+| **Phase E** | Task 4.7.6 + 測試 | 2-3 小時 | Phase C |
+| E.1 | Cache Warming 實作 | 1 小時 | C.1 |
+| E.2-E.3 | 測試 + Benchmark | 1 小時 | E.1 |
+| **總計** | - | **12-18 小時** | - |
+
+---
+
+### 📂 Critical Files for Implementation
+
+| 檔案路徑 | 說明 | 重要性 |
+|---------|------|--------|
+| `/opt/docker/docker-compose.yml` | Docker 服務編排（全部服務） | P0 |
+| `cloudflare-wordpress/src/routes/api/warm-cache/+server.ts` | Cache Warming API（Task 4.7.6） | P0 |
+| `cloudflare-wordpress/src/hooks.server.ts` | Main Worker 邏輯（唔需改動） | P0 |
+| `cloudflare-wordpress/wrangler.toml` | Cloudflare 綁定設定 | P1 |
+| `Wordpress Plugin/wp-d1-sync.php` | WordPress D1 同步插件 | P1 |
+
+---
+
+**文檔完成日期：2026-01-19**
+**版本：1.0**
+**規劃模型：Claude Opus 4.5**
+**用戶確認：✅（2026-01-19）**
