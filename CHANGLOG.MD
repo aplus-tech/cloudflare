@@ -113,6 +113,42 @@ SYNC_SECRET_KEY = "Lui@63006021"
 | D1 總產品數 | ✅ 12 條記錄 | D1 Query: `SELECT COUNT(*) FROM sync_products` |
 | Updated timestamp | ✅ 1768759354 (2026-01-18 05:55:54 UTC) | D1 Query Result |
 
+### 規劃 Planning
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 20:00 UTC | Task 4.7.6：規劃 Cache Warming 功能（Sitemap Crawler） | PROGRESS.md:253-300 |
+
+#### Task 4.7.6 規劃詳情
+
+**【問題原因】**
+- 現時 KV Cache 係被動式：只有用戶訪問先會 cache
+- 用戶要求主動式 warm up：一次過將所有頁面預先 cache
+- 避免首次訪問慢（3.59s），確保所有用戶都享受到 cache 加速（0.15s）
+
+**【方案成立】**
+使用 **Sitemap Crawler 方案**：
+- WordPress 自動生成 Sitemap（`/wp-sitemap.xml`）
+- 建立 `/api/warm-cache` endpoint fetch sitemap 並批量訪問 URLs
+- 並發控制 10 concurrent requests
+- Secret key 認證（同 PURGE_SECRET）
+- 無額外費用（Cloudflare Pages Free Plan）
+
+**【來源證據】**
+- PROGRESS.md:253-300 - 詳細技術方案
+- .ai/context.yaml:32-42 - 記錄為 current_focus
+- WordPress Sitemap 官方文檔：https://make.wordpress.org/core/2020/07/22/new-xml-sitemaps-functionality-in-wordpress-5-5/
+- 參考實作：Netlify Cache Warmer Plugin
+
+**技術細節**：
+```typescript
+// API Endpoint: /api/warm-cache
+// 流程：
+// 1. Fetch sitemap XML (http://origin.aplus-tech.com.hk/wp-sitemap.xml)
+// 2. Parse XML 提取所有 URLs
+// 3. 批量 fetch URLs（並發控制 10 concurrent）
+// 4. 返回 cached URL count
+```
+
 ---
 
 ## 2026-01-12

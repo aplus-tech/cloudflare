@@ -207,6 +207,96 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 
 ---
 
+#### 任務 4.7.6：實作 Cache Warming 功能（用戶確認：2026-01-18）
+
+**【問題原因】**
+- 現時 KV Cache 係被動式：只有用戶訪問先會 cache
+- 首次訪問需要 3.59s，之後 cache hit 只需 0.15s（96% 減少）
+- 用戶要求主動式 warm up：一次過預先 cache 所有頁面
+
+**【方案成立】**
+使用 **Sitemap Crawler 方案**：
+- WordPress 自動生成 Sitemap（`/wp-sitemap.xml`）
+- 建立 `/api/warm-cache` endpoint
+- 並發控制 10 concurrent requests
+- 無額外費用（Cloudflare Pages Free Plan）
+
+**技術實作步驟**：
+
+- [ ] **步驟 1**：建立 API Endpoint
+  - 檔案：`cloudflare-wordpress/src/routes/api/warm-cache/+server.ts`
+  - 實作 POST handler
+  - 加入 Secret key 驗證（同 PURGE_SECRET）
+
+- [ ] **步驟 2**：實作 Sitemap Fetcher
+  ```typescript
+  // Fetch WordPress sitemap
+  const sitemapUrl = 'http://origin.aplus-tech.com.hk/wp-sitemap.xml';
+  const response = await fetch(sitemapUrl);
+  const xml = await response.text();
+  ```
+
+- [ ] **步驟 3**：實作 XML Parser
+  ```typescript
+  // Parse XML 提取所有 <loc> URLs
+  const urls = parseSitemapXML(xml);
+  // 返回：['https://...', 'https://...', ...]
+  ```
+
+- [ ] **步驟 4**：實作並發控制批量 Fetch
+  ```typescript
+  // 限制 10 concurrent requests
+  const batchSize = 10;
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(url => fetch(url)) // 觸發 KV Cache
+    );
+  }
+  ```
+
+- [ ] **步驟 5**：返回結果
+  ```typescript
+  return json({
+    success: true,
+    cached: urls.length,
+    urls: urls // 選填：返回已 cache 嘅 URL 清單
+  });
+  ```
+
+- [ ] **步驟 6**：測試功能
+  ```bash
+  # 手動觸發 warm cache
+  curl -X POST https://cloudflare-9qe.pages.dev/api/warm-cache \
+    -H "Content-Type: application/json" \
+    -d '{"secret": "Lui@63006021"}'
+
+  # 驗證返回結果
+  # 應返回：{"success":true,"cached":XX}
+
+  # 檢查 KV Cache
+  npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491
+  # 應該睇到所有 "html:..." keys
+  ```
+
+- [ ] **步驟 7**：效能驗證
+  - 執行 warm cache API
+  - 用 `curl -w` 測試多個頁面載入速度
+  - 確認所有頁面都係 cache hit（0.15s 左右）
+
+**【來源證據】**
+- PROGRESS.md:253-300 - 詳細技術方案
+- .ai/context.yaml:32-42 - 當前焦點
+- WordPress Sitemap：https://make.wordpress.org/core/2020/07/22/new-xml-sitemaps-functionality-in-wordpress-5-5/
+- 參考實作：Netlify Cache Warmer Plugin（https://github.com/netlify/netlify-plugin-cache-warmer）
+
+**相關檔案**：
+- 新建：`cloudflare-wordpress/src/routes/api/warm-cache/+server.ts`
+- 使用：`hooks.server.ts` 現有 cache 邏輯（自動觸發 KV 儲存）
+- 參考：`src/routes/api/purge/+server.ts` - Secret key 驗證機制
+
+---
+
 ### 🟠 中優先級：性能優化
 
 #### 任務 4.7.2：優化 media_mapping 查詢

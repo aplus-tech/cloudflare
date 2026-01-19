@@ -29,6 +29,18 @@ priority_docs:
   - "implementation_plan.md"
   - "architecture_design.md"
 
+# 當前狀態追蹤（AI 自動識別用）
+current_status:
+  last_confirmed: "2026-01-18"
+  confirmed_by: "user"
+  current_focus:
+    phase: "4.7"
+    task: "Task 4.7.6 - Cache Warming 實作"
+    next_step: "建立 /api/warm-cache/+server.ts endpoint"
+    user_note: "用戶確認使用 Solution 1 (Sitemap Crawler)"
+
+  on_hold_tasks: []
+
 # 代碼風格
 code_style:
   indent: "2 spaces"                    # SvelteKit 用 2 spaces

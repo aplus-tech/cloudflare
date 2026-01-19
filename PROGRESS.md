@@ -226,11 +226,11 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 
 ### Phase 4.7：安全與效能優化
 
-**狀態**：等待中
-**原因**：用戶確認 - 等待 Phase 4.8 完成後執行
-**優先級**：P0-P1（移除明文密碼 + KV Cache 優化）
-**最後更新**：2026-01-12
-**計劃開始**：Phase 4.8 完成後
+**狀態**：準備開始
+**原因**：Phase 4.8 已完成，可以開始執行
+**優先級**：P0-P1（移除明文密碼 + KV Cache 優化 + Cache Warming）
+**最後更新**：2026-01-18
+**計劃開始**：2026-01-18
 
 #### 待辦任務
 - [ ] Task 4.7.1（P0）：移除 wrangler.toml 明文密碼
@@ -240,7 +240,63 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 - [ ] Task 4.7.2（P1）：優化 media_mapping 查詢（加 KV Cache）
 - [ ] Task 4.7.3（P1）：並行上傳圖片（Promise.all）
 - [ ] Task 4.7.4（P1）：加入重試機制（Exponential Backoff）
-- [ ] Task 4.7.5（P1）：統一緩存 Key 格式
+- [ ] Task 4.7.5（P1）：統一緩存 Key 格式（✅ 已完成於 Phase 4.8.5）
+- [ ] Task 4.7.6（P1）：實作 Cache Warming 功能（Sitemap Crawler）
+  - [ ] 建立 `/api/warm-cache` endpoint
+  - [ ] Fetch WordPress Sitemap XML
+  - [ ] Parse XML 提取所有 URL
+  - [ ] 批量 fetch URLs 觸發 KV Cache（並發控制：10 concurrent）
+  - [ ] 加入 Secret key 驗證機制
+  - [ ] 測試功能正常運作
+
+#### Task 4.7.6 詳細方案：Cache Warming（用戶確認：2026-01-18）
+
+**【問題原因】**
+- 現時 KV Cache 係被動式：只有用戶訪問先會 cache
+- 用戶要求主動式 warm up：一次過將所有頁面預先 cache
+- 避免首次訪問慢（3.59s），確保所有用戶都享受到 cache 加速（0.15s）
+
+**【方案成立】**
+使用 **方案 1：Sitemap Crawler**
+
+**優點**：
+- WordPress 自動生成 Sitemap（`/wp-sitemap.xml`），自動包含所有公開頁面
+- 唔需要手動維護 URL 清單
+- 唔需要額外費用（Cloudflare Pages Free Plan 已足夠）
+- 可以手動觸發或用免費 cron service 定期執行
+
+**技術實作**：
+1. **API Endpoint**：`/api/warm-cache`
+2. **認證機制**：Secret key（同 PURGE_SECRET 一致）
+3. **流程**：
+   ```typescript
+   // Step 1: Fetch Sitemap
+   const sitemapUrl = 'http://origin.aplus-tech.com.hk/wp-sitemap.xml';
+   const sitemap = await fetch(sitemapUrl);
+
+   // Step 2: Parse XML 提取 URLs
+   const urls = parseSitemapXML(sitemap);
+
+   // Step 3: 批量 fetch（並發控制）
+   const results = await Promise.all(
+     urls.map(url => fetch(url)) // 限制 10 concurrent
+   );
+
+   // Step 4: 返回結果
+   return { success: true, cached: urls.length };
+   ```
+
+4. **並發控制**：限制每次最多 10 個 concurrent requests，避免打爆 origin server
+
+**【來源證據】**
+- WordPress Sitemap：https://make.wordpress.org/core/2020/07/22/new-xml-sitemaps-functionality-in-wordpress-5-5/
+- Sitemap URL：`http://origin.aplus-tech.com.hk/wp-sitemap.xml`
+- Cloudflare Pages Free Plan：無需額外費用
+- 參考實作：Netlify Cache Warmer Plugin（https://github.com/netlify/netlify-plugin-cache-warmer）
+
+**相關檔案**：
+- 新建：`cloudflare-wordpress/src/routes/api/warm-cache/+server.ts`
+- 使用：`hooks.server.ts` 現有 cache 邏輯（自動觸發 KV 儲存）
 
 ---
 
