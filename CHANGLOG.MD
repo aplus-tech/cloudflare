@@ -4,6 +4,117 @@
 
 ---
 
+## 2026-01-20
+
+### 完成 Completed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 02:00 UTC | Phase 5.0 Phase A：VPS 診斷完成 ✅ | PROGRESS.md:328-362 |
+
+#### Phase 5.0 Phase A VPS 診斷詳情
+
+**【問題原因】**
+- 需要驗證新 VPS 實際硬件規格與已安裝服務
+- 確認 AI 工具（Claude Code、Gemini CLI）安裝狀態
+- 評估 Docker 服務資源使用情況
+
+**【方案成立】**
+- SSH 連接到 VPS (76.13.30.201) 執行診斷命令
+- 檢查硬件規格：free -h, df -h, docker ps
+- 驗證 AI 工具：直接運行 claude 和 gemini 命令
+- 檢查現有 docker-compose.yml 配置
+
+**【來源證據】**
+- PROGRESS.md:328-362（完整診斷結果）
+- .ai/IDEAS.md:489-499（VPS 規格更新）
+- .ai/IDEAS.md:911-989（AI 工具安裝狀態更新）
+
+**關鍵發現**：
+1. **硬件規格更正**：
+   - 文檔記錄：8GB RAM
+   - 實際容量：**15GB RAM**（多 87.5%）
+   - 存儲：193GB total (18GB used, 10%)
+
+2. **已安裝 AI 工具**（✅ 已驗證）：
+   - Claude Code CLI（顯示 trust dialog）
+   - Gemini CLI v0.24.4（完整 CLI 介面）
+   - Node.js v20.20.0
+   - Docker Compose v5.0.1
+
+3. **運行中 Docker 服務**（6 個）：
+   - Nginx Proxy Manager (ports 80/81/443)
+   - WordPress (port 8080)
+   - MariaDB (WordPress 資料庫)
+   - n8n (自動化平台)
+   - PostgreSQL (n8n 資料庫)
+   - WAHA (WhatsApp HTTP API)
+
+4. **待安裝項目**：
+   - pip3 (Python package manager)
+   - Redis 服務 (n8n Queue Mode 需要)
+
+### 修改 Changed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 02:00 UTC | 更新 PROGRESS.md VPS RAM 規格：8GB → 15GB | PROGRESS.md:334, 377, 398-410 |
+| 02:00 UTC | 更新 IDEAS.md VPS 規格與資源分配表 | .ai/IDEAS.md:467-481, 489-499, 896-907 |
+| 02:00 UTC | 標記 B.2 Claude Code 安裝為已完成 | .ai/IDEAS.md:911-947 |
+| 02:00 UTC | 標記 B.3 Gemini CLI 安裝為已完成 | .ai/IDEAS.md:951-989 |
+
+#### 修改 1：VPS RAM 規格更正
+
+**【問題原因】**
+- IDEAS.md 和 PROGRESS.md 均記錄 VPS 為 8GB RAM
+- 實際診斷顯示 VPS 有 15GB RAM
+
+**【方案成立】**
+- 更新所有文檔中的 RAM 規格為 15GB
+- 重新計算資源分配：4.9GB → 9.5GB (Docker 服務)
+- 系統預留：3.1GB → 5.5GB
+
+**【來源證據】**
+- PROGRESS.md:334（診斷結果）
+- PROGRESS.md:377（核心目標）
+- PROGRESS.md:398-410（資源分配表）
+- .ai/IDEAS.md:467-481（計劃概要）
+- .ai/IDEAS.md:489-499（VPS 規格表）
+- .ai/IDEAS.md:896-907（資源分配總覽）
+
+#### 修改 2：AI 工具安裝狀態更新
+
+**【問題原因】**
+- 文檔標記 Claude Code 和 Gemini CLI 為「待安裝」
+- 實際診斷證實兩者已安裝並可正常運行
+
+**【方案成立】**
+- 更新 Phase B.2 和 B.3 為「✅ 已完成」
+- 添加驗證時間戳記：2026-01-20
+- 記錄具體版本和測試結果
+
+**【來源證據】**
+- .ai/IDEAS.md:911-947（B.2 Claude Code 已完成）
+- .ai/IDEAS.md:951-989（B.3 Gemini CLI 已完成）
+- PROGRESS.md:346-351（已安裝 AI 工具列表）
+
+### 新增 Added
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 02:00 UTC | PROGRESS.md 新增「🔍 VPS 診斷結果」章節 | PROGRESS.md:328-362 |
+
+**【問題原因】**
+- 需要記錄 VPS 診斷詳細結果
+- 追蹤已完成和待完成項目
+
+**【方案成立】**
+- 創建獨立診斷結果章節
+- 分類記錄：硬件規格、已安裝服務、AI 工具、待安裝項目
+- 標記 docker-compose.yml 位置和待優化項目
+
+**【來源證據】**
+- PROGRESS.md:328-362（完整診斷結果章節）
+
+---
+
 ## 2026-01-18
 
 ### 完成 Completed

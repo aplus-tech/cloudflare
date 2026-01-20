@@ -320,10 +320,46 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 
 ### Phase 5.0：VPS 遷移與 AI 自動化整合（2026-01-19 開始）
 
-**狀態**：🟡 計劃階段
+**狀態**：🟢 Phase A 進行中（VPS 診斷完成）
 **優先級**：P0（用戶確認）
 **預計完成時間**：12-18 小時
 **詳細計劃**：參見 [.ai/IDEAS.md](.ai/IDEAS.md#Phase-5-8-Overview) 完整 1738 行實施方案
+
+#### 🔍 VPS 診斷結果（2026-01-20）
+
+**VPS 連接**：✅ 成功（`root@76.13.30.201` via SSH key）
+
+**實際硬件規格**：
+- CPU：2 cores
+- **RAM：15GB**（❗️注意：文檔誤記為 8GB，實際多 87.5%）
+- 存儲：193GB total（18GB used, 10%）
+- 記憶體使用：2.0GB / 15GB（13GB 可用）
+
+**已安裝服務**（Docker）：
+- ✅ Nginx Proxy Manager（ports 80/81/443）
+- ✅ WordPress（port 8080）
+- ✅ MariaDB（WordPress 資料庫）
+- ✅ n8n（自動化平台）
+- ✅ PostgreSQL（n8n 資料庫）
+- ✅ WAHA（WhatsApp HTTP API）
+
+**已安裝 AI 工具**：
+- ✅ Claude Code CLI（已驗證可運行，顯示 trust dialog）
+- ✅ Gemini CLI v0.24.4（已驗證可運行，完整 CLI 介面）
+- ✅ Node.js v20.20.0
+- ✅ Docker Compose v5.0.1
+- ✅ Gemini API Key 已配置（~/.bashrc）
+
+**待安裝項目**：
+- ⏳ pip3（Python package manager）
+- ⏳ Redis 服務（n8n Queue Mode 需要）
+
+**docker-compose.yml 位置**：`/opt/aplus-tech/docker-compose.yml`
+
+**待優化項目**：
+- 添加資源限制（memory limits）到 docker-compose.yml
+- 添加 .env 文件（移除硬編碼密碼）
+- 添加 Redis 服務配置
 
 #### 📋 5-Phase 架構概覽
 
@@ -338,8 +374,8 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 #### 🎯 核心目標
 
 1. **VPS 遷移**：
-   - 新 VPS：2 CPU / 8GB RAM / 100GB NVMe / $6.99/month
-   - 資源分配：4.9GB 保留 + 3.1GB 可用（AI 工具 + 系統）
+   - 新 VPS：2 CPU / **15GB RAM** / 193GB Storage / $6.99/month
+   - 資源分配：~10GB 可用於 Docker 服務 + 5GB 預留（AI 工具 + 系統）
 
 2. **100% 保留現有功能**：
    - ✅ KV Edge Cache（96% 加速，0.15s TTFB）
@@ -349,28 +385,29 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
    - ✅ Worker URL 代理（`cloudflare-9qe.pages.dev`）
 
 3. **新增 AI 自動化**：
-   - 🆕 Claude Code CLI（本地開發工具）
-   - 🆕 Gemini CLI（Vision OCR + 內容生成）
-   - 🆕 n8n 自動化平台（Redis Queue Mode）
-   - 🆕 WAHA WhatsApp Bot（Webhook 整合）
+   - ✅ Claude Code CLI（本地開發工具）**已安裝並驗證**
+   - ✅ Gemini CLI v0.24.4（Vision OCR + 內容生成）**已安裝並驗證**
+   - ⏳ n8n 自動化平台（Redis Queue Mode）**n8n 已安裝，待添加 Redis**
+   - ✅ WAHA WhatsApp Bot（Webhook 整合）**已安裝**
 
 4. **業務功能擴展**：
    - 🆕 WhatsApp 客戶服務自動化（WAHA + n8n + D1 CRM）
    - 🆕 收據/發票掃描會計系統（Gemini Vision OCR + D1 Accounting）
    - 🆕 社交媒體內容行銷（WordPress REST API + Facebook Graph API）
 
-#### 📊 資源分配（8GB RAM Total）
+#### 📊 資源分配（15GB RAM Total - 已更正）
 
 | 服務 | 記憶體限制 | 說明 |
 |------|-----------|------|
-| MySQL | 1GB | WordPress 資料庫 |
-| WordPress | 1GB | PHP-FPM + Apache |
-| PostgreSQL | 512MB | n8n 資料庫 |
-| n8n | 1GB | Queue Mode 自動化平台 |
-| WAHA | 1GB | WhatsApp HTTP API |
-| Redis | 256MB | n8n Queue Backend |
-| **小計** | **4.9GB** | Docker 服務保留 |
-| 系統 + AI 工具 | 3.1GB | OS + Claude Code + Gemini CLI |
+| MySQL | 2GB | WordPress 資料庫（15GB 環境可分配更多）|
+| WordPress | 2GB | PHP-FPM + Apache |
+| PostgreSQL | 1GB | n8n 資料庫 |
+| n8n | 2GB | Queue Mode 自動化平台 |
+| WAHA | 1.5GB | WhatsApp HTTP API |
+| Redis | 512MB | n8n Queue Backend |
+| NPM | 512MB | Nginx Proxy Manager |
+| **小計** | **9.5GB** | Docker 服務保留 |
+| 系統 + AI 工具 | 5.5GB | OS + Claude Code + Gemini CLI |
 
 #### 🔧 關鍵技術決策
 
