@@ -320,7 +320,7 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 
 ### Phase 5.0：VPS 遷移與 AI 自動化整合（2026-01-19 開始）
 
-**狀態**：🟢 Phase A 進行中（VPS 診斷完成）
+**狀態**：🟢 Phase B 完成（Docker 優化 + Redis 部署）
 **優先級**：P0（用戶確認）
 **預計完成時間**：12-18 小時
 **詳細計劃**：參見 [.ai/IDEAS.md](.ai/IDEAS.md#Phase-5-8-Overview) 完整 1738 行實施方案
@@ -350,23 +350,25 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 - ✅ Docker Compose v5.0.1
 - ✅ Gemini API Key 已配置（~/.bashrc）
 
-**待安裝項目**：
-- ⏳ pip3（Python package manager）
-- ⏳ Redis 服務（n8n Queue Mode 需要）
+**已完成項目**（2026-01-21）：
+- ✅ Redis 服務（redis:7-alpine，512M limit）
+- ✅ 資源限制優化（9.5GB / 15GB，預留 5.5GB 系統）
+- ✅ .env 文件（移除硬編碼密碼）
+- ✅ docker-compose.yml 備份（docker-compose.yml.backup）
+- ✅ n8n Queue Mode（EXECUTIONS_MODE=queue + Redis）
 
 **docker-compose.yml 位置**：`/opt/aplus-tech/docker-compose.yml`
 
-**待優化項目**：
-- 添加資源限制（memory limits）到 docker-compose.yml
-- 添加 .env 文件（移除硬編碼密碼）
-- 添加 Redis 服務配置
+**部署狀態**：
+- ✅ 7 個容器運行中（npm, wordpress, db-wp, n8n, db-n8n, redis, waha）
+- ✅ Redis 已連接 n8n（Queue Mode 啟用）
 
 #### 📋 5-Phase 架構概覽
 
 | Phase | 名稱 | 狀態 | 說明 |
 |-------|------|------|------|
-| **Phase A** | VPS 遷移準備 | 待開始 | DNS 配置 + Docker 環境遷移 |
-| **Phase B** | 基礎服務部署 | 待開始 | Docker Compose 多服務編排（WordPress + n8n + WAHA + AI 工具）|
+| **Phase A** | VPS 遷移準備 | ✅ 完成 | VPS 診斷完成（2026-01-20）|
+| **Phase B** | 基礎服務部署 | ✅ 完成 | Docker Compose 優化 + Redis 部署（2026-01-21）|
 | **Phase C** | 功能保留驗證 | 待開始 | 100% 保留現有 Cloudflare 功能（10 項測試清單）|
 | **Phase D** | 新功能整合 | 待開始 | WhatsApp Bot + CRM + 會計系統 + 內容行銷自動化 |
 | **Phase E** | Cache Warming | 待開始 | 完成 Task 4.7.6（Sitemap Crawler 實作）|
