@@ -50,3 +50,117 @@ code_style:
   naming: "camelCase"                   # TypeScript 用 camelCase
   max_line_length: 100
   comment_language: "cantonese"         # 註解用廣東話
+
+# 文件更新邏輯系統（數據層）
+documentation_update:
+  # 文件分類清單
+  file_classification:
+    core_tracking:
+      - "PROGRESS.md"                   # 進度追蹤
+      - "task.md"                       # 完整任務清單
+      - "CHANGLOG.md"                   # 改動記錄（強制更新）
+
+    technical_docs:
+      - "architecture_design.md"        # 完整架構設計
+      - "implementation_plan.md"        # 實施計劃
+
+    api_architecture:
+      - "docs/ARCHITECTURE.md"          # 架構概覽
+      - "docs/API_SPEC.md"              # API 規範
+
+    ai_config:
+      - ".ai/IDEAS.md"                  # 完整實施方案
+      - ".ai/ATTEMPTED_SOLUTIONS.md"    # 失敗方案記錄
+      - ".ai/CLAUDE.md"                 # AI 行為規則
+      - ".ai/CLAUDE_OPUS.md"            # Opus 架構規則
+      - ".ai/context.yaml"              # 專案配置（本文件）
+
+    backup_debug:
+      - "README.md"                     # 專案說明
+      - "debug_*.md"                    # 除錯記錄
+
+  # 操作類型列表（用戶必須指定）
+  operation_types:
+    - "新功能"        # 全新功能開發
+    - "新構思"        # 新的技術方案或架構設計
+    - "修復"          # Bug 修復
+    - "加建"          # 在現有功能上添加內容
+    - "刪除"          # 移除過時內容
+    - "取代"          # 替換舊實作
+    - "優化"          # 性能或代碼質量改進
+    - "重構"          # 架構或代碼結構調整
+
+  # 屬性映射表（操作類型 → 影響文件）
+  attribute_mapping:
+    新功能:
+      mandatory:
+        - "CHANGLOG.md"                 # 永遠強制
+        - "PROGRESS.md"                 # 進度追蹤
+        - "task.md"                     # 任務清單
+      check_if_major:
+        - "architecture_design.md"      # 重大變更檢查
+        - "implementation_plan.md"      # 重大變更檢查
+        - "docs/ARCHITECTURE.md"        # 重大變更檢查
+        - ".ai/IDEAS.md"                # 新構思記錄
+      check_if_api:
+        - "docs/API_SPEC.md"            # 如涉及 API
+
+    新構思:
+      mandatory:
+        - "CHANGLOG.md"
+        - ".ai/IDEAS.md"                # 構思記錄
+        - "PROGRESS.md"
+      check_if_major:
+        - "architecture_design.md"
+        - "implementation_plan.md"
+        - "docs/ARCHITECTURE.md"
+
+    修復:
+      mandatory:
+        - "CHANGLOG.md"
+        - "PROGRESS.md"
+        - ".ai/ATTEMPTED_SOLUTIONS.md"  # 記錄失敗方案
+      optional:
+        - "task.md"                     # 如修復涉及任務變更
+
+    加建:
+      mandatory:
+        - "CHANGLOG.md"
+        - "PROGRESS.md"
+      check_context:
+        - "task.md"                     # 根據加建內容判斷
+        - ".ai/IDEAS.md"                # 如加建新構思
+
+    刪除:
+      mandatory:
+        - "CHANGLOG.md"
+        - "PROGRESS.md"
+      check_if_major:
+        - "architecture_design.md"      # 如刪除重要功能
+        - "docs/ARCHITECTURE.md"
+
+    取代:
+      mandatory:
+        - "CHANGLOG.md"
+        - "PROGRESS.md"
+        - ".ai/ATTEMPTED_SOLUTIONS.md"  # 記錄舊方案為何失敗
+      check_if_major:
+        - "architecture_design.md"      # 重大替換
+        - "implementation_plan.md"
+        - "docs/ARCHITECTURE.md"
+
+    優化:
+      mandatory:
+        - "CHANGLOG.md"
+        - "PROGRESS.md"
+      check_if_major:
+        - "architecture_design.md"      # 如架構級優化
+
+    重構:
+      mandatory:
+        - "CHANGLOG.md"
+        - "PROGRESS.md"
+      check_if_major:
+        - "architecture_design.md"      # 重構通常影響架構
+        - "implementation_plan.md"
+        - "docs/ARCHITECTURE.md"

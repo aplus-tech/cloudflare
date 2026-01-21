@@ -9,7 +9,56 @@
 ### 完成 Completed
 | 時間 | 改動 | 來源證據 |
 |------|------|---------|
+| 03:15 UTC | 新構思：建立文件更新邏輯系統（屬性判斷） ✅ | .ai/context.yaml:54-166, .ai/CLAUDE.md:184-370 |
 | 02:00 UTC | Phase 5.0 Phase A：VPS 診斷完成 ✅ | PROGRESS.md:328-362 |
+
+#### 新構思：文件更新邏輯系統
+
+**【問題原因】**
+- 現有 MD 文件更新邏輯存在重大問題：
+  - 只處理 PROGRESS.md 和 IDEAS.md
+  - 不知如何檢查和處理其他相關 MD 文件
+  - 使用關鍵字搜尋而非屬性判斷
+  - 經常忘記更新 CHANGLOG.md
+  - 忘記檢查技術文檔（architecture_design.md, docs/*.md）
+
+**【方案成立】**
+- 建立屬性判斷系統取代關鍵字搜尋
+- 拆分數據層（context.yaml）與邏輯層（CLAUDE.md）
+- 強制要求用戶指定 8 種操作類型
+- 建立文件分類清單與屬性映射表
+- 區分現有項目修改 vs 新項目開發
+
+**【來源證據】**
+- .ai/context.yaml:54-166（數據層配置）
+- .ai/CLAUDE.md:184-370（Rule 13 工作流程）
+
+**核心設計**：
+
+1. **8 種操作類型**（用戶必須指定）：
+   - 新功能、新構思、修復、加建、刪除、取代、優化、重構
+
+2. **文件分類清單**（5 大類）：
+   - core_tracking: PROGRESS.md, task.md, CHANGLOG.md
+   - technical_docs: architecture_design.md, implementation_plan.md
+   - api_architecture: docs/ARCHITECTURE.md, docs/API_SPEC.md
+   - ai_config: .ai/IDEAS.md, .ai/ATTEMPTED_SOLUTIONS.md, .ai/CLAUDE.md, .ai/CLAUDE_OPUS.md
+   - backup_debug: README.md, debug_*.md
+
+3. **屬性映射表**：
+   - 每種操作類型 → mandatory/check_if_major/check_if_api/check_context
+   - 例：新功能 → mandatory: [CHANGLOG.md, PROGRESS.md, task.md]
+
+4. **工作流程**（5 步驟）：
+   - 步驟 1：強制要求用戶指定操作類型（禁止估計）
+   - 步驟 2：判斷更新場景（現有項目 vs 新項目）
+   - 步驟 3：屬性判斷（非關鍵字搜尋）
+   - 步驟 4：強制規則檢查（CHANGLOG.md 永遠強制）
+   - 步驟 5：執行更新並確認
+
+5. **重大變更判斷標準**：
+   - ✅ 重大：新增/刪除 Phase、架構變更、API 變更、Schema 變更、影響 >3 文件
+   - ❌ 小變更：單一文件 bug、文檔錯字、單一參數調整
 
 #### Phase 5.0 Phase A VPS 診斷詳情
 

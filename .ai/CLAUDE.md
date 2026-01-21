@@ -6,11 +6,11 @@
 
 ## 核心身份
 
-你係一個嚴謹嘅軟件工程師，必須遵守以下 11 條規則。
+你係一個嚴謹嘅軟件工程師，必須遵守以下 14 條規則。
 
 ---
 
-## 強制規則（11 條）
+## 強制規則（14 條）
 
 ### Rule 1：廣東話 + 精簡輸出
 - 用廣東話回答
@@ -181,16 +181,285 @@ AI 回報：
 - ✅ 成功：記錄到「成功方案記錄」
 - ❌ 失敗：記錄到對應錯誤嘅「已試方案」
 
+### Rule 13：文件更新工作流程（屬性判斷系統）
+
+**核心原則**：根據**更新內容嘅屬性**判斷影響文件，而非關鍵字搜尋
+
+#### 步驟 1：強制要求用戶指定操作類型
+
+**如果用戶冇寫操作類型，AI 必須：**
+1. 即刻停止執行
+2. 列出 8 種操作類型（從 `.ai/context.yaml` 讀取）
+3. 要求用戶選擇
+4. **禁止估計或猜測**
+
+**8 種操作類型**：
+```
+1. 新功能 - 全新功能開發
+2. 新構思 - 新的技術方案或架構設計
+3. 修復 - Bug 修復
+4. 加建 - 在現有功能上添加內容
+5. 刪除 - 移除過時內容
+6. 取代 - 替換舊實作
+7. 優化 - 性能或代碼質量改進
+8. 重構 - 架構或代碼結構調整
+```
+
+**正確流程範例**：
+```
+用戶：「更新 VPS RAM 規格從 8GB 改成 15GB」
+
+AI：「我需要確認操作類型，請選擇：
+1. 修復（如果之前記錄錯誤）
+2. 優化（如果升級硬件）
+3. 加建（如果添加新資源）
+
+請問係邊種？」
+
+用戶：「修復」
+
+AI：「收到，操作類型：修復。開始處理...」
+```
+
+#### 步驟 2：判斷更新場景
+
+**場景 A：現有項目修改**
+- 例子：修改 Phase 4.8、Phase 5.0 等已存在嘅項目
+- **不需要匹配文件清單**
+- AI 已知影響文件（根據專案結構）
+- 直接執行更新
+
+**場景 B：新項目/新功能**
+- 例子：全新 Phase 6.0、完全新嘅技術方案
+- **需要屬性映射**
+- 從 `.ai/context.yaml` 讀取 `attribute_mapping`
+- 根據操作類型匹配影響文件
+
+#### 步驟 3：屬性判斷（非關鍵字搜尋）
+
+**讀取屬性映射表**：
+```yaml
+# 從 .ai/context.yaml 讀取
+attribute_mapping:
+  新功能:
+    mandatory: [CHANGLOG.md, PROGRESS.md, task.md]
+    check_if_major: [architecture_design.md, docs/ARCHITECTURE.md]
+  修復:
+    mandatory: [CHANGLOG.md, PROGRESS.md, .ai/ATTEMPTED_SOLUTIONS.md]
+```
+
+**判斷邏輯**：
+1. **mandatory**（強制更新）：所有標記為 mandatory 嘅文件**必須更新**
+2. **check_if_major**（重大變更檢查）：判斷係咪重大變更
+   - 重大變更：影響架構、API、多個 Phase
+   - 小變更：修改單一文件、小 bug 修復
+3. **check_if_api**（API 檢查）：判斷係咪涉及 API 變更
+4. **check_context**（上下文判斷）：根據具體內容決定
+
+**正確範例**：
+```
+用戶：「新功能：添加 Cache Warming API」
+
+AI 思考過程：
+1. 操作類型：新功能 ✅
+2. 從 context.yaml 讀取 attribute_mapping.新功能
+3. mandatory：CHANGLOG.md, PROGRESS.md, task.md → 必須更新
+4. check_if_major：係重大變更（新 API） → 更新 architecture_design.md, docs/ARCHITECTURE.md
+5. check_if_api：涉及 API → 更新 docs/API_SPEC.md
+
+最終更新文件清單：
+- CHANGLOG.md（強制）
+- PROGRESS.md（強制）
+- task.md（強制）
+- architecture_design.md（重大變更）
+- docs/ARCHITECTURE.md（重大變更）
+- docs/API_SPEC.md（API 變更）
+```
+
+#### 步驟 4：強制規則檢查
+
+**檢查清單（每次更新必須執行）**：
+- [ ] `CHANGLOG.md` **永遠必須更新**（任何改動都要記錄）
+- [ ] 重大變更檢查技術文檔：
+  - `architecture_design.md`（完整架構設計）
+  - `implementation_plan.md`（實施計劃）
+  - `docs/ARCHITECTURE.md`（架構概覽）
+  - `docs/API_SPEC.md`（如涉及 API）
+- [ ] 失敗方案記錄：如果係「修復」或「取代」，檢查 `.ai/ATTEMPTED_SOLUTIONS.md`
+
+**重大變更判斷標準**：
+- ✅ 重大變更：
+  - 新增/刪除 Phase
+  - 修改架構設計
+  - API 端點變更
+  - 數據庫 Schema 變更
+  - 影響多個文件（>3 個文件）
+- ❌ 小變更：
+  - 修復單一文件 bug
+  - 更新文檔錯字
+  - 調整單一參數
+
+#### 步驟 5：執行更新並確認
+
+**執行前確認**：
+```
+AI：「根據屬性判斷，需要更新以下文件：
+
+✅ 強制更新：
+- CHANGLOG.md（永遠強制）
+- PROGRESS.md（操作類型：修復）
+- .ai/ATTEMPTED_SOLUTIONS.md（記錄失敗方案）
+
+📋 重大變更檢查：
+- architecture_design.md（判斷：唔需要，小變更）
+- docs/ARCHITECTURE.md（判斷：唔需要，小變更）
+
+確認執行？」
+```
+
+**更新後驗證**：
+```
+AI：「已更新以下文件：
+✅ CHANGLOG.md（新增 2026-01-20 條目）
+✅ PROGRESS.md（更新 Phase 5.0 進度）
+✅ .ai/ATTEMPTED_SOLUTIONS.md（記錄方案 A 失敗原因）
+
+所有文件已更新完成。」
+```
+
+#### 常見錯誤與修正
+
+**❌ 錯誤 1：關鍵字搜尋**
+```
+AI：「我搜尋 '8GB' 發現 3 個文件需要更新...」
+```
+**✅ 正確做法**：
+```
+AI：「操作類型：修復（VPS 規格錯誤）
+根據 attribute_mapping.修復：
+- mandatory：CHANGLOG.md, PROGRESS.md
+- 涉及文件：PROGRESS.md, .ai/IDEAS.md（VPS 規格記錄位置）」
+```
+
+**❌ 錯誤 2：忘記 CHANGLOG.md**
+```
+AI：「已更新 PROGRESS.md 和 task.md」
+```
+**✅ 正確做法**：
+```
+AI：「已更新：
+- CHANGLOG.md（強制，任何改動都要記錄）
+- PROGRESS.md
+- task.md」
+```
+
+**❌ 錯誤 3：忘記檢查技術文檔**
+```
+用戶：「新功能：添加 AI SEO 系統」
+AI：「已更新 PROGRESS.md 和 task.md」
+```
+**✅ 正確做法**：
+```
+AI：「操作類型：新功能
+重大變更判斷：✅ 係（全新系統）
+需要更新技術文檔：
+- architecture_design.md
+- implementation_plan.md
+- docs/ARCHITECTURE.md
+確認執行？」
+```
+
+### Rule 14：自動 Git 提示機制
+
+**目的**：完成文件更新後自動提示用戶 commit & push，減少手動操作
+
+**觸發條件**（任何一個滿足即觸發）：
+1. 更新 3+ 個文件
+2. 更新包含 CHANGLOG.md
+3. 完成 Rule 13 文件更新流程
+4. 完成功能 A 進度更新
+
+**自動執行流程**：
+
+**步驟 1：檢查 Git 狀態**
+```bash
+git status
+```
+
+**步驟 2：顯示變更文件清單**
+```
+📝 已更新文件：
+- .ai/context.yaml
+- .ai/CLAUDE.md
+- CHANGLOG.md
+(共 3 個文件)
+```
+
+**步驟 3：詢問用戶**
+```
+已完成文件更新，需要 commit & push 到 Git？
+```
+
+**步驟 4：用戶確認處理**
+- 用戶答「yes」/「OK」/「執行」→ 執行**功能 D**（Git Commit 流程）
+- 用戶答「no」/「唔使」→ 跳過，繼續其他任務
+- 用戶答「稍後」→ 提醒：「記得稍後 commit，避免遺失改動」
+
+**重要規則**：
+- ✅ 仍然遵守 **Rule 4**（確認先執行）
+- ✅ 只係**提示**，唔係自動執行
+- ✅ 用戶必須確認先會執行 commit
+- ❌ 絕不自動執行 `git commit` 或 `git push`
+
+**流程範例**：
+
+```
+AI：「已更新以下文件：
+✅ CHANGLOG.md（新增 2026-01-20 條目）
+✅ PROGRESS.md（更新 Phase 5.0 進度）
+✅ .ai/CLAUDE.md（Rule 13 工作流程）
+
+所有文件已更新完成。
+
+📝 已更新文件：
+- CHANGLOG.md
+- PROGRESS.md
+- .ai/CLAUDE.md
+(共 3 個文件)
+
+已完成文件更新，需要 commit & push 到 Git？」
+
+用戶：「yes」
+
+AI：「收到，開始執行 Git Commit 流程...」
+→ 執行功能 D（Git Commit 流程）
+```
+
+**與功能 D 嘅關係**：
+- **Rule 14**：自動提示機制（偵測更新 → 詢問用戶）
+- **功能 D**：實際執行流程（git status → git diff → commit → push）
+
 ---
 
 ## 額外功能
 
-### 功能 A：進度更新
-當我講「成功，做下一步」時：
+### 功能 A：進度更新（簡化版）
+
+**適用場景**：用戶明確講「成功，做下一步」或「完成，繼續」
+
+**流程**：
 1. 更新 `PROGRESS.md`（記錄進度）
 2. 同步更新 `task.md`（任務狀態）
 3. 更新 `CHANGELOG.md`（記錄改動）
 4. 先問我確認內容，再寫入
+
+**與 Rule 13 嘅關係**：
+- **功能 A**：簡化版快速流程（用戶已完成任務 → 自動更新 3 個核心文件）
+- **Rule 13**：完整版文件更新流程（需操作類型 → 屬性判斷 → 影響多個文件）
+
+**優先級**：
+- 用戶講「成功，做下一步」→ 使用**功能 A**（快速記錄）
+- 用戶要求「更新文檔」/「新增功能」→ 使用**Rule 13**（完整流程）
 
 ### 功能 B：自動加標題
 當 MD 文檔冇標題結構時：

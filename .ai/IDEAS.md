@@ -662,7 +662,7 @@ curl "https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021"
 #### B.1 Docker Compose 架構設計
 
 **【問題原因】**
-需要喺 8GB RAM 內運行多個服務：WordPress、n8n、WAHA、Redis、PostgreSQL。
+需要喺 15GB RAM 內運行多個服務：WordPress、n8n、WAHA、Redis、PostgreSQL。
 
 **【方案成立】**
 使用 Docker Compose 統一管理，合理分配資源限制。
@@ -675,7 +675,7 @@ curl "https://cloudflare-9qe.pages.dev/api/purge-all?secret=Lui@63006021"
 
 ```yaml
 # 檔案位置：/opt/docker/docker-compose.yml
-# 資源分配：8GB RAM 總計
+# 資源分配：15GB RAM 總計（實際診斷 2026-01-20）
 
 version: '3.8'
 
