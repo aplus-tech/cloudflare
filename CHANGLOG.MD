@@ -4,6 +4,77 @@
 
 ---
 
+## 2026-01-21
+
+### 完成 Completed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 15:00 UTC | Phase 5.0 Phase B：Docker 優化 + Redis 部署 ✅ | PROGRESS.md:353-364, VPS /opt/aplus-tech/docker-compose.yml |
+
+#### Phase 5.0 Phase B 完成詳情
+
+**【問題原因】**
+- VPS docker-compose.yml 缺乏資源限制（15GB RAM 未充分利用）
+- n8n 未啟用 Queue Mode（需要 Redis）
+- 明文密碼硬編碼於 docker-compose.yml（安全風險）
+
+**【方案成立】**
+- 添加 Redis 服務（redis:7-alpine）用於 n8n Queue Mode
+- 優化資源分配：9.5GB Docker 服務 / 5.5GB 系統預留
+- 建立 .env 檔案，移除明文密碼
+- 備份舊配置（docker-compose.yml.backup）
+
+**【來源證據】**
+- VPS /opt/aplus-tech/docker-compose.yml（優化版）
+- VPS /opt/aplus-tech/.env（環境變數）
+- VPS docker compose ps（7 個容器運行中）
+- PROGRESS.md:353-364（完成記錄）
+
+**關鍵改動**：
+
+1. **Redis 服務新增**（n8n Queue Mode）：
+   ```yaml
+   redis:
+     image: redis:7-alpine
+     deploy:
+       resources:
+         limits:
+           memory: 512M
+         reservations:
+           memory: 256M
+   ```
+
+2. **資源限制優化**（15GB RAM 環境）：
+   - MySQL: 2GB（原無限制 → 2GB）
+   - WordPress: 2GB（原無限制 → 2GB）
+   - PostgreSQL: 1GB（原無限制 → 1GB）
+   - n8n: 2GB（原無限制 → 2GB + Queue Mode）
+   - WAHA: 1.5GB（原無限制 → 1.5GB）
+   - Redis: 512MB（新增）
+   - NPM: 512MB（原無限制 → 512MB）
+   - **總計**: 9.5GB / 15GB（預留 5.5GB 系統 + AI 工具）
+
+3. **n8n Queue Mode 啟用**：
+   ```yaml
+   environment:
+     - EXECUTIONS_MODE=queue
+     - QUEUE_BULL_REDIS_HOST=redis
+     - QUEUE_BULL_REDIS_PORT=6379
+   ```
+
+4. **安全改進**：
+   - 明文密碼 → .env 環境變數
+   - 舊配置備份（docker-compose.yml.backup）
+   - .env.example 模板建立
+
+**部署結果**：
+- ✅ 7 個容器運行中（npm, wordpress, db-wp, n8n, db-n8n, redis, waha）
+- ✅ Redis 連接 n8n 成功
+- ✅ 資源使用優化（9.5GB / 15GB）
+- ✅ Phase 5.0 Phase B 完成
+
+---
+
 ## 2026-01-20
 
 ### 完成 Completed

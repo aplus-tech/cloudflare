@@ -7,8 +7,9 @@
 ## 📊 進度總覽
 
 - ✅ **已完成**：Phase 0-4.6（基礎設施、緩存、同步、R2 遷移）
-- ⚠️ **進行中**：Phase 4.8（VPS 全面測試 - 準備生產遷移）
-- 🚧 **待開始**：Phase 4.7（修復安全和性能問題）、Phase 5-6（Invoice/Quote 系統、AI SEO 系統）
+- ✅ **已完成**：Phase 4.8（已完成 2026-01-18）
+- ✅ **已完成**：Phase 5.0 Phase A-B（VPS 診斷 + Docker 優化，已完成 2026-01-21）
+- 🚧 **待開始**：Phase 4.7（修復安全和性能問題）、Phase 5.0 Phase C-E（功能保留、新功能整合、測試）、Phase 5-6（Invoice/Quote 系統、AI SEO 系統）
 
 ---
 
@@ -60,7 +61,7 @@
 
 ---
 
-## 🧪 Phase 4.8：VPS 全面測試（進行中）
+## ✅ Phase 4.8：VPS 全面測試（已完成 2026-01-18）
 
 ### 目標
 確認 VPS (http://15.235.199.194/) 所有功能正常，準備將域名遷移
@@ -294,6 +295,208 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 - 新建：`cloudflare-wordpress/src/routes/api/warm-cache/+server.ts`
 - 使用：`hooks.server.ts` 現有 cache 邏輯（自動觸發 KV 儲存）
 - 參考：`src/routes/api/purge/+server.ts` - Secret key 驗證機制
+
+---
+
+## ✅ Phase 5.0 Phase A：VPS 診斷（已完成 2026-01-20）
+
+### 目標
+驗證新 VPS (76.13.30.201) 實際硬件規格與已安裝服務，評估資源使用情況。
+
+### 診斷結果
+
+#### VPS 連接
+- [x] SSH 連接成功（root@76.13.30.201 via SSH key）✅
+
+#### 實際硬件規格
+- [x] CPU：2 cores ✅
+- [x] **RAM：15GB**（❗️更正：文檔誤記為 8GB，實際多 87.5%）✅
+- [x] 存儲：193GB total（18GB used, 10%）✅
+- [x] 記憶體使用：2.0GB / 15GB（13GB 可用）✅
+
+#### 已安裝服務（Docker）
+- [x] Nginx Proxy Manager（ports 80/81/443）✅
+- [x] WordPress（port 8080）✅
+- [x] MariaDB（WordPress 資料庫）✅
+- [x] n8n（自動化平台）✅
+- [x] PostgreSQL（n8n 資料庫）✅
+- [x] WAHA（WhatsApp HTTP API）✅
+
+#### 已安裝 AI 工具
+- [x] Claude Code CLI（已驗證可運行，顯示 trust dialog）✅
+- [x] Gemini CLI v0.24.4（已驗證可運行，完整 CLI 介面）✅
+- [x] Node.js v20.20.0 ✅
+- [x] Docker Compose v5.0.1 ✅
+- [x] Gemini API Key 已配置（~/.bashrc）✅
+
+#### 關鍵發現
+1. **硬件規格更正**：
+   - 文檔記錄：8GB RAM
+   - 實際容量：**15GB RAM**（多 87.5%）
+   - 存儲：193GB total (18GB used, 10%)
+
+2. **運行中 Docker 服務**（6 個）：
+   - Nginx Proxy Manager (ports 80/81/443)
+   - WordPress (port 8080)
+   - MariaDB (WordPress 資料庫)
+   - n8n (自動化平台)
+   - PostgreSQL (n8n 資料庫)
+   - WAHA (WhatsApp HTTP API)
+
+3. **待安裝項目**：
+   - pip3 (Python package manager)
+   - Redis 服務 (n8n Queue Mode 需要)
+
+**【來源證據】**：
+- PROGRESS.md:328-362（完整診斷結果）
+- CHANGLOG.md:134-175（Phase A 完成詳情）
+- .ai/IDEAS.md:487-561（VPS 規格與診斷步驟）
+
+---
+
+## ✅ Phase 5.0 Phase B：Docker 優化 + Redis 部署（已完成 2026-01-21）
+
+### 目標
+優化 VPS Docker 資源分配，部署 Redis 服務，啟用 n8n Queue Mode。
+
+### 完成項目
+
+#### B.1 Redis 服務部署
+- [x] Redis 服務（redis:7-alpine，512M limit）✅
+- [x] Redis 連接 n8n 成功 ✅
+- [x] n8n Queue Mode 啟用（EXECUTIONS_MODE=queue）✅
+
+#### B.2 資源限制優化（15GB RAM 環境）
+- [x] MySQL: 2GB（原無限制 → 2GB）✅
+- [x] WordPress: 2GB（原無限制 → 2GB）✅
+- [x] PostgreSQL: 1GB（原無限制 → 1GB）✅
+- [x] n8n: 2GB（原無限制 → 2GB + Queue Mode）✅
+- [x] WAHA: 1.5GB（原無限制 → 1.5GB）✅
+- [x] Redis: 512MB（新增）✅
+- [x] NPM: 512MB（原無限制 → 512MB）✅
+- [x] **總計**: 9.5GB / 15GB（預留 5.5GB 系統 + AI 工具）✅
+
+#### B.3 安全改進
+- [x] 明文密碼 → .env 環境變數 ✅
+- [x] 舊配置備份（docker-compose.yml.backup）✅
+- [x] .env.example 模板建立 ✅
+
+#### B.4 部署結果
+- [x] 7 個容器運行中（npm, wordpress, db-wp, n8n, db-n8n, redis, waha）✅
+- [x] Redis 連接 n8n 成功 ✅
+- [x] 資源使用優化（9.5GB / 15GB）✅
+- [x] Phase 5.0 Phase B 完成 ✅
+
+**docker-compose.yml 位置**：`/opt/aplus-tech/docker-compose.yml`
+
+**【來源證據】**：
+- PROGRESS.md:353-364（完成記錄）
+- CHANGLOG.md:14-74（Phase B 完成詳情）
+- .ai/IDEAS.md:660-1102（Docker Compose 架構設計）
+
+---
+
+## 🚧 Phase 5.0 Phase C：功能保留驗證（待開始）
+
+### 目標
+確保 VPS 遷移後，Cloudflare Workers、KV Cache、D1 同步、R2 媒體等現有功能繼續正常運作。
+
+### C.1 Cloudflare Workers 持續運作驗證
+- [ ] 確認 Worker 部署正常（curl -I https://cloudflare-9qe.pages.dev/）
+- [ ] 測試 KV Cache HIT（第一次 MISS，第二次 HIT）
+- [ ] 測試靜態資源代理（CSS/JS）
+- [ ] 測試 R2 圖片（https://media.aplus-tech.com.hk/...）
+
+### C.2 KV Cache 驗證程序
+- [ ] 清空現有 Cache（curl purge-all API）
+- [ ] 效能測試（首次訪問 2-4s，二次訪問 <0.2s）
+- [ ] 驗證 Cache Key 格式（npx wrangler kv key list）
+
+### C.3 D1 Database 同步驗證
+- [ ] 測試產品同步（WordPress 更新 → D1 查詢）
+- [ ] 驗證 API 認證（POST /api/sync）
+- [ ] 清理測試數據
+
+### C.4 R2 媒體存儲連接測試
+- [ ] 驗證現有圖片可訪問（從 D1 獲取路徑 → curl R2 URL）
+- [ ] 測試新圖片上傳（WordPress 上傳 → D1 media_mapping）
+
+### C.5 完整功能測試清單
+
+| 功能 | 測試方法 | 預期結果 | 實際結果 |
+|------|---------|---------|---------|
+| KV Cache HIT | `curl -I` 兩次 | 第二次 X-Cache: HIT | [ ] |
+| 效能加速 | `curl -w` 測時間 | 從 3s+ 到 0.15s | [ ] |
+| D1 產品同步 | WordPress 更新 → D1 查詢 | < 1 秒內同步 | [ ] |
+| D1 文章同步 | WordPress 發布 → D1 查詢 | 記錄存在 | [ ] |
+| R2 圖片上傳 | 上傳產品圖 | media_mapping 有記錄 | [ ] |
+| R2 圖片訪問 | `curl` R2 URL | 200 OK | [ ] |
+| Purge 單頁 | 更新產品 → 檢查 KV | 對應 key 被刪除 | [ ] |
+| Purge 全部 | 調用 purge-all API | 所有 key 被刪除 | [ ] |
+| Admin 繞過 | 訪問 /wp-admin/ | Redirect 到 origin | [ ] |
+| 登入繞過 | 帶 cookie 訪問 | 無 KV Cache | [ ] |
+
+**【來源證據】**：
+- .ai/IDEAS.md:1105-1269（Phase C 驗證步驟）
+
+---
+
+## 🚧 Phase 5.0 Phase D：新功能整合（待開始）
+
+### 目標
+整合 WhatsApp Bot、會計自動化、內容行銷自動化等新功能。
+
+### D.1 WhatsApp Bot 設定（WAHA + n8n + D1 CRM）
+- [ ] WAHA 接收訊息 → n8n 處理邏輯 → D1 存儲客戶數據
+- [ ] 建立 D1 CRM Schema（crm_contacts, crm_conversations）
+- [ ] 設定 n8n Workflow（關鍵詞識別、自動回覆、記錄 D1、通知管理員）
+
+### D.2 會計自動化（Gemini Vision OCR → D1 → iXBRL）
+- [ ] Gemini 2.5 Pro Vision OCR 識別發票/收據
+- [ ] 建立 D1 Accounting Schema（accounting_chart, accounting_entries, accounting_reports）
+- [ ] n8n 自動化流程（上傳圖片 → OCR → D1 記錄 → 生成報表）
+
+### D.3 內容行銷自動化（Crawler → WordPress → Social Media）
+- [ ] n8n 定時爬取供應商網站
+- [ ] Claude/Gemini AI 改寫內容（SEO 優化）
+- [ ] WordPress REST API 發布文章
+- [ ] Facebook/Instagram Graph API 發布帖文
+
+**【來源證據】**：
+- .ai/IDEAS.md:1273-1409（Phase D 新功能整合）
+
+---
+
+## 🚧 Phase 5.0 Phase E：Cache Warming + 測試（待開始）
+
+### 目標
+實作 Cache Warming API，執行完整效能測試，驗證所有功能正常運作。
+
+### E.1 Cache Warming API Endpoint 實作
+- [ ] 建立 `/api/warm-cache` endpoint（cloudflare-wordpress/src/routes/api/warm-cache/+server.ts）
+- [ ] 實作 Sitemap Fetcher（fetch WordPress sitemap）
+- [ ] 實作 XML Parser（提取所有 <loc> URLs）
+- [ ] 實作並發控制批量 Fetch（限制 10 concurrent requests）
+- [ ] 返回結果（cached URLs, errors, timing）
+
+### E.2 測試 Cache Warming
+- [ ] 部署代碼（npm run build + wrangler pages deploy）
+- [ ] 測試 GET（查看 sitemap）
+- [ ] 執行 Warm Cache（POST /api/warm-cache）
+- [ ] 驗證 KV Cache（npx wrangler kv key list）
+
+### E.3 效能 Benchmarking
+
+| 狀態 | TTFB | Total Time | 加速比 |
+|------|------|------------|--------|
+| 無 Cache | ~2.5s | ~3.5s | 1x |
+| 有 Cache | ~0.08s | ~0.15s | 23x |
+| **改善** | **96%** | **96%** | - |
+
+**【來源證據】**：
+- PROGRESS.md:253-300（Cache Warming 技術方案）
+- task.md:226-297（Task 4.7.6 步驟）
+- .ai/IDEAS.md:1412-1675（Phase E 完整代碼設計）
 
 ---
 
