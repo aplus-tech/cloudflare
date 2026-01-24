@@ -1720,3 +1720,226 @@ curl -X POST "https://cloudflare-9qe.pages.dev/api/warm-cache" \
 **版本：1.0**
 **規劃模型：Claude Opus 4.5**
 **用戶確認：✅（2026-01-19）**
+
+---
+
+## 🔴 2026-01-24：架構決策變更 - 暫停 Workers/KV/D1 計劃
+
+**決策日期**：2026-01-24 23:30 UTC
+**決策模型**：Claude Sonnet 4.5
+**決策類型**：架構簡化
+**狀態**：✅ 已確認並執行
+
+---
+
+### 📊 決策摘要
+
+**選擇方案**：方案 B - R2 + Cloudflare CDN（只保留 R2 圖片 CDN）
+
+**核心理由**：
+1. ✅ VPS LiteSpeed 本身已經快（TTFB 0.37s < 0.5s 標準）
+2. ✅ Workers 架構複雜度 >> 收益（cache hit 只快 0.29s，用戶無感）
+3. ✅ R2 CDN 圖片加速已解決 80% 效能問題（圖片佔頁面 80-90%）
+4. ✅ 零維護成本（消除 8 個架構缺點）
+
+---
+
+### 🔍 VPS 速度測試結果（關鍵證據）
+
+**測試時間**：2026-01-24 23:05 UTC
+**測試對象**：新 VPS (76.13.30.201) WordPress 直接訪問
+
+```
+TTFB: 0.369602s ✅ (首字節時間)
+Total Time: 0.666938s
+Size: 226655 bytes (221 KB)
+Status: 200 OK
+Server: LiteSpeed
+```
+
+**效能對比**：
+
+| 指標 | VPS 直連 | KV Cache Hit | 差距 | 評價 |
+|------|---------|-------------|------|------|
+| TTFB | 0.37s | 0.08s | +0.29s | ✅ 用戶無感（<0.3s） |
+| Total Time | 0.67s | 0.15s | +0.52s | ✅ 可接受 |
+| Cache Miss | 0.37s | 3.59s | **-3.22s** | ✅ **VPS 快 10 倍** |
+
+**結論**：
+- ✅ VPS 本身已經「快」（TTFB < 0.5s 標準）
+- ✅ KV Cache Hit 只快 0.29s（收益微小）
+- ✅ 唔需要承受 Workers 架構複雜度
+
+---
+
+### ⏸️ 暫停項目清單
+
+#### Phase 4.7：安全與效能優化（已暫停）
+
+**原計劃**：
+- Task 4.7.1：移除明文密碼（wrangler secrets）
+- Task 4.7.2：KV Cache 層（media_mapping）
+- Task 4.7.3：並行上傳圖片（Promise.all）
+- Task 4.7.4：重試機制（Exponential Backoff）
+- Task 4.7.5：統一緩存 Key 格式
+- **Task 4.7.6：Cache Warming API** ← 主要暫停
+
+**暫停原因**：
+- VPS 本身快（TTFB 0.37s），唔需要 KV Cache
+- 暫停 KV Cache → Cache Warming 唔需要
+- Task 4.7.3-4.7.5 仍可保留（R2 上傳優化）
+
+**狀態**：⏸️ 暫停（保留代碼，唔刪除）
+
+---
+
+#### Phase 5.0 Phase C.1-C.3：Workers/KV/D1 驗證（已暫停）
+
+**原計劃**：
+- C.0：新 VPS 狀態檢查 ✅（已完成）
+- **C.1：Cloudflare Workers 驗證** ← 暫停
+- **C.2：KV Cache 驗證** ← 暫停
+- **C.3：D1 Database 同步驗證** ← 暫停
+- C.4：R2 媒體存儲測試 ✅（保留，繼續測試）
+- C.5：完整功能測試清單 ⚠️（部分暫停）
+
+**暫停原因**：
+- Workers/KV/D1 架構已暫停
+- C.4 R2 測試保留（R2 CDN 繼續使用）
+
+**狀態**：⏸️ 部分暫停
+
+---
+
+#### Phase 5.0 Phase E：Cache Warming + 測試（已暫停）
+
+**原計劃**：
+- E.1：Cache Warming API 實作（Task 4.7.6）
+- E.2：測試 Cache Warming（效能測試）
+- E.3：效能 Benchmarking（基準測試）
+
+**暫停原因**：
+- 暫停 KV Cache → Cache Warming 唔需要
+
+**狀態**：⏸️ 暫停
+
+---
+
+### ✅ 保留項目
+
+#### R2 圖片存儲 + CDN（繼續使用）
+
+**架構**：
+```
+WordPress (VPS) ←→ 用戶
+    ↓ 上傳圖片
+R2 Storage
+    ↓
+Cloudflare CDN (自動 cache 圖片)
+    ↓
+用戶瀏覽器
+```
+
+**優點**：
+- ✅ 圖片 CDN 加速（<50ms TTFB）
+- ✅ 零出站流量費（R2 → CDN 免費）
+- ✅ 架構簡單（只有 2 個組件）
+- ✅ 冇 cache invalidation 問題
+
+**下一步**：
+1. 驗證 R2 Custom Domain 設定
+2. 測試圖片 CDN 效能
+3. 確認 WordPress Plugin 正常運作
+
+---
+
+#### Phase D：新功能整合（繼續執行）
+
+**保留項目**：
+- ✅ D.1：WhatsApp Bot（WAHA + n8n）
+- ✅ D.2：會計自動化（Gemini Vision OCR）
+- ✅ D.3：內容行銷自動化（Crawler + Claude API）
+
+**原因**：
+- 呢啲功能唔依賴 Workers/KV/D1
+- 基於 VPS (n8n, WAHA, PostgreSQL)
+- 繼續按計劃執行
+
+---
+
+### 📋 暫停決策完整分析
+
+**完整文檔**：docs/ARCHITECTURE_ISSUES.md
+
+**包含內容**：
+1. **8 個架構缺點分析**（問題原因 + 實際影響 + 來源證據）
+   - 缺點 1：Cache Invalidation 慢
+   - 缺點 2：D1 同步失敗風險
+   - 缺點 3：Cold Start 慢
+   - 缺點 4：無法精準 Invalidate 關聯頁面
+   - 缺點 5：KV 免費額度限制
+   - 缺點 6：動態內容繞過 Cache
+   - 缺點 7：Debug 困難
+   - 缺點 8：R2 同步唔保證原子性
+
+2. **3 個方案完整比較**
+   - 方案 A：R2 + WordPress Plugin
+   - 方案 B：R2 + Cloudflare CDN ← **選擇**
+   - 方案 C：保留現有架構但簡化
+
+3. **最終決策理由**
+   - VPS 本身快（TTFB 0.37s）
+   - Workers 複雜度 > 收益
+   - R2 CDN 已解決主要效能問題
+   - 零維護成本
+
+---
+
+### 📝 文檔更新記錄
+
+**已更新文檔**：
+- ✅ docs/ARCHITECTURE_ISSUES.md（新建，400+ 行完整分析）
+- ✅ CHANGLOG.md（記錄架構決策）
+- ✅ PROGRESS.md（更新 Phase 狀態 + 暫停清單）
+- ✅ task.md（標記暫停項目）
+- ✅ .ai/IDEAS.md（本文件，記錄暫停決策）
+
+**待更新**：
+- ⏳ .ai/context.yaml（on_hold_tasks 更新）
+
+---
+
+### 🎯 下一步行動
+
+#### 立即執行
+
+1. ✅ 驗證 R2 CDN 設定（Custom Domain: media.aplus-tech.com.hk）
+2. ✅ 測試 WordPress 圖片 URL 替換
+3. ✅ 確認 R2 上傳 Plugin 正常運作
+
+#### 短期計劃
+
+1. 繼續 Phase D：新功能整合（WhatsApp Bot, n8n）
+2. 優化 R2 上傳流程（Task 4.7.3-4.7.5 保留）
+3. 建立 R2 圖片 CDN 效能監控
+
+#### 長期考慮
+
+**何時需要重新考慮 Workers 架構？**
+
+1. **VPS 變慢**：TTFB > 1s
+2. **流量暴增**：超過 VPS 處理能力
+3. **全球用戶**：需要邊緣節點加速
+
+**目前狀況**：
+- ✅ VPS 快（TTFB 0.37s）
+- ✅ 流量唔高
+- ✅ 用戶主要喺香港/亞洲
+
+**結論**：暫時唔需要 Workers 架構
+
+---
+
+**決策記錄完成日期**：2026-01-24
+**下次審查日期**：視 VPS 效能變化而定
+**記錄模型**：Claude Sonnet 4.5

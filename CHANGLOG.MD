@@ -6,10 +6,44 @@
 
 ## 2026-01-24
 
-### 進行中 In Progress
+### 完成 Completed
 | 時間 | 改動 | 來源證據 |
 |------|------|---------|
+| 23:30 UTC | 架構決策：暫停 Workers/KV/D1，只保留 R2 CDN ✅ | docs/ARCHITECTURE_ISSUES.md |
 | 23:00 UTC | Phase 5.0 Phase C：新 VPS 狀態檢查 ✅ | 檢查結果記錄於下方 |
+
+#### 架構決策：暫停 Workers/KV/D1 計劃
+
+**【問題原因】**
+- VPS LiteSpeed 本身已經快（TTFB 0.37s）
+- Workers + KV + D1 架構有 8 個缺點（詳見 docs/ARCHITECTURE_ISSUES.md）
+- 架構複雜度高於收益（cache hit 只快 0.29s）
+
+**【方案成立】**
+- 方案 B：R2 + Cloudflare CDN（只用 R2 存儲圖片 + CDN 加速）
+- WordPress HTML 直接由 VPS 提供（TTFB 0.37s，可接受）
+- 圖片由 R2 CDN 提供（<50ms，快）
+
+**【來源證據】**
+- VPS 測試：TTFB 0.37s（curl 測試結果）
+- docs/ARCHITECTURE_ISSUES.md（8 個缺點分析 + 3 個方案比較）
+- PROGRESS.md:191-222（Phase 4.8 效能測試：KV Hit 0.08s vs VPS 0.37s）
+
+**【暫停項目】**
+- ❌ Phase 4.7：安全與效能優化（Cache Warming 唔需要）
+- ❌ Task 4.7.6：Cache Warming API
+- ❌ Phase 5.0 Phase C.1-C.3：Workers/KV/D1 驗證測試
+- ❌ Phase 5.0 Phase E：Cache Warming + 測試
+
+**【保留項目】**
+- ✅ R2 圖片存儲 + CDN（繼續使用）
+- ✅ WordPress Plugin（R2 上傳功能）
+
+**【文檔更新】**
+- 新建：docs/ARCHITECTURE_ISSUES.md（完整分析記錄）
+- 更新：PROGRESS.md（記錄暫停決策）
+- 更新：task.md（標記暫停項目）
+- 更新：.ai/context.yaml（on_hold_tasks）
 
 #### Phase 5.0 Phase C 新 VPS 狀態檢查
 

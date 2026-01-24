@@ -396,19 +396,56 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 - origin.aplus-tech.com.hk → 15.235.199.194（舊 VPS）
 - 新 VPS: 76.13.30.201
 
-**下一步**：執行 C.1-C.5 功能驗證測試
+**下一步**：~~執行 C.1-C.5 功能驗證測試~~ → **已暫停（架構決策變更）**
 
 ---
 
-#### 📋 5-Phase 架構概覽
+### 🔴 架構決策：暫停 Workers/KV/D1 計劃（2026-01-24 23:30 UTC）
+
+#### 決策摘要
+
+**選擇方案 B**：R2 + Cloudflare CDN（只保留 R2 圖片 CDN）
+
+**核心理由**：
+1. ✅ VPS LiteSpeed 本身已經快（TTFB 0.37s）
+2. ✅ Workers 架構複雜度 > 收益（cache hit 只快 0.29s）
+3. ✅ R2 CDN 圖片加速已解決 80% 效能問題
+4. ✅ 零維護成本（冇 cache invalidation 問題）
+
+#### 暫停項目清單
+
+| 項目 | 原計劃 | 暫停原因 |
+|------|--------|---------|
+| Phase 4.7 | 安全與效能優化 | VPS 本身快，唔需要 KV Cache |
+| Task 4.7.6 | Cache Warming API | 暫停 KV Cache，唔需要 warming |
+| Phase C.1-C.3 | Workers/KV/D1 驗證 | 暫停 Workers 架構 |
+| Phase E | Cache Warming 測試 | 暫停 KV Cache |
+
+#### 保留項目
+
+- ✅ R2 圖片存儲 + CDN
+- ✅ WordPress Plugin（R2 上傳）
+- ✅ Phase D：新功能整合（WhatsApp Bot, n8n 自動化）
+
+#### 詳細分析
+
+**完整分析記錄**：docs/ARCHITECTURE_ISSUES.md
+- 8 個架構缺點分析
+- 3 個方案比較（A/B/C）
+- VPS 速度測試結果
+- 最終決策理由
+
+---
+
+#### 📋 5-Phase 架構概覽（已更新）
 
 | Phase | 名稱 | 狀態 | 說明 |
 |-------|------|------|------|
 | **Phase A** | VPS 遷移準備 | ✅ 完成 | VPS 診斷完成（2026-01-20）|
 | **Phase B** | 基礎服務部署 | ✅ 完成 | Docker Compose 優化 + Redis 部署（2026-01-21）|
-| **Phase C** | 功能保留驗證 | 🔄 進行中 | 新 VPS 狀態檢查完成（2026-01-24），下一步：C.1-C.5 功能測試 |
+| **Phase C** | 功能保留驗證 | ⏸️ 部分暫停 | C.0 完成，C.1-C.3 暫停（Workers 架構暫停）|
 | **Phase D** | 新功能整合 | 待開始 | WhatsApp Bot + CRM + 會計系統 + 內容行銷自動化 |
-| **Phase E** | Cache Warming | 待開始 | 完成 Task 4.7.6（Sitemap Crawler 實作）|
+| **Phase E** | Cache Warming | ⏸️ 暫停 | 已暫停（KV Cache 架構暫停）|
 
 #### 🎯 核心目標
 
