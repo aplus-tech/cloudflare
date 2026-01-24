@@ -363,13 +363,50 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 - ✅ 7 個容器運行中（npm, wordpress, db-wp, n8n, db-n8n, redis, waha）
 - ✅ Redis 已連接 n8n（Queue Mode 啟用）
 
+---
+
+### 🔄 Phase 5.0 Phase C：功能保留驗證（進行中 2026-01-24）
+
+#### C.0 新 VPS 狀態檢查（2026-01-24 23:00 UTC）
+
+**檢查結果**：✅ WordPress + Docker 服務正常運行
+
+**詳細狀態**：
+
+**VPS 基本資訊** ✅
+- IP: 76.13.30.201
+- 運行時間: 47 小時（自 2026-01-23 啟動）
+
+**Docker 服務狀態** ✅ 全部運行中（Up 47 hours）
+- wordpress (LiteSpeed): port 8080
+- db-wp (MariaDB): port 3306
+- n8n: port 5678
+- waha: port 3001
+- redis: port 6379
+- npm (Nginx Proxy Manager): port 80/443
+- db-n8n (PostgreSQL): port 5432
+
+**WordPress 狀態** ✅ 已遷移並運行
+- Server: LiteSpeed
+- HTTP Status: 200 OK
+- Domain: aplus-tech.com.hk
+- wp-content: 完整（plugins, themes, uploads 全部遷移）
+
+**DNS 狀態** ⚠️ 待確認
+- origin.aplus-tech.com.hk → 15.235.199.194（舊 VPS）
+- 新 VPS: 76.13.30.201
+
+**下一步**：執行 C.1-C.5 功能驗證測試
+
+---
+
 #### 📋 5-Phase 架構概覽
 
 | Phase | 名稱 | 狀態 | 說明 |
 |-------|------|------|------|
 | **Phase A** | VPS 遷移準備 | ✅ 完成 | VPS 診斷完成（2026-01-20）|
 | **Phase B** | 基礎服務部署 | ✅ 完成 | Docker Compose 優化 + Redis 部署（2026-01-21）|
-| **Phase C** | 功能保留驗證 | 待開始 | 100% 保留現有 Cloudflare 功能（10 項測試清單）|
+| **Phase C** | 功能保留驗證 | 🔄 進行中 | 新 VPS 狀態檢查完成（2026-01-24），下一步：C.1-C.5 功能測試 |
 | **Phase D** | 新功能整合 | 待開始 | WhatsApp Bot + CRM + 會計系統 + 內容行銷自動化 |
 | **Phase E** | Cache Warming | 待開始 | 完成 Task 4.7.6（Sitemap Crawler 實作）|
 

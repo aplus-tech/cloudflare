@@ -396,10 +396,50 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 
 ---
 
-## 🚧 Phase 5.0 Phase C：功能保留驗證（待開始）
+## 🔄 Phase 5.0 Phase C：功能保留驗證（進行中 2026-01-24）
 
 ### 目標
 確保 VPS 遷移後，Cloudflare Workers、KV Cache、D1 同步、R2 媒體等現有功能繼續正常運作。
+
+### 當前進度
+- [x] C.0：新 VPS 狀態檢查（2026-01-24 23:00 UTC）✅
+- [ ] C.1：Cloudflare Workers 驗證
+- [ ] C.2：KV Cache 驗證
+- [ ] C.3：D1 Database 同步驗證
+- [ ] C.4：R2 媒體存儲測試
+- [ ] C.5：完整功能測試清單
+
+---
+
+### C.0 新 VPS 狀態檢查 ✅
+
+**檢查時間**：2026-01-24 23:00 UTC
+
+**檢查結果**：✅ WordPress + Docker 服務正常運行
+
+**VPS 基本資訊**
+- IP: 76.13.30.201
+- 運行時間: 47 小時
+
+**Docker 服務**（7 個容器運行中）
+- wordpress (LiteSpeed): port 8080
+- db-wp (MariaDB)
+- n8n: port 5678
+- waha: port 3001
+- redis
+- npm (Nginx Proxy Manager)
+- db-n8n (PostgreSQL)
+
+**WordPress 狀態**
+- HTTP 200 OK
+- wp-content 完整遷移
+
+**DNS 狀態**
+- origin.aplus-tech.com.hk → 15.235.199.194（待確認）
+
+（詳細記錄見 PROGRESS.md:368-400, CHANGLOG.md:7-58）
+
+---
 
 ### C.1 Cloudflare Workers 持續運作驗證
 - [ ] 確認 Worker 部署正常（curl -I https://cloudflare-9qe.pages.dev/）

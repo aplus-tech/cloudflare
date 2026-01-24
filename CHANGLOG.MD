@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-01-24
+
+### 進行中 In Progress
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 23:00 UTC | Phase 5.0 Phase C：新 VPS 狀態檢查 ✅ | 檢查結果記錄於下方 |
+
+#### Phase 5.0 Phase C 新 VPS 狀態檢查
+
+**【問題原因】**
+- Phase 5.0 Phase B（Docker + Redis）已完成
+- Phase C 功能保留驗證需要確認新 VPS 運行狀態
+- 需要檢查 WordPress、Docker 服務、DNS 配置
+
+**【方案成立】**
+- SSH 直接連接新 VPS (76.13.30.201)
+- 執行 `docker ps` 檢查容器狀態
+- 測試 WordPress HTTP 響應
+- 檢查 wp-content 數據完整性
+
+**【來源證據】**
+- VPS SSH: root@76.13.30.201
+- Docker 輸出: 7 個容器運行中（Up 47 hours）
+- WordPress 測試: HTTP 200 OK (port 8080)
+
+**【檢查結果】**
+
+**VPS 基本資訊** ✅
+- IP: 76.13.30.201
+- 運行時間: 47 小時（自 2026-01-23 啟動）
+
+**Docker 服務狀態** ✅ 全部運行中
+- wordpress (LiteSpeed): Up 47h, port 8080
+- db-wp (MariaDB): Up 47h, port 3306
+- n8n: Up 47h, port 5678
+- waha: Up 47h, port 3001
+- redis: Up 47h, port 6379
+- npm (Nginx Proxy Manager): Up 47h, port 80/443
+- db-n8n (PostgreSQL): Up 47h, port 5432
+
+**WordPress 狀態** ✅ 已遷移並運行
+- Server: LiteSpeed
+- HTTP Status: 200 OK
+- Domain: aplus-tech.com.hk
+- wp-content: 完整（plugins, themes, uploads 全部遷移）
+
+**DNS 狀態** ⚠️ 待確認
+- origin.aplus-tech.com.hk → 15.235.199.194（舊 VPS）
+- 新 VPS: 76.13.30.201
+
+**下一步**：執行 C.1-C.5 功能驗證測試
+
+---
+
 ## 2026-01-21
 
 ### 完成 Completed
