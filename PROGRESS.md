@@ -400,6 +400,50 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 
 ---
 
+### ✅ Phase C.4：R2 媒體存儲驗證完成（2026-01-25 00:10 UTC）
+
+#### 驗證結果
+
+| 驗證項目 | 狀態 | 結果 |
+|---------|------|------|
+| R2 Custom Domain | ✅ 已設定 | media.aplus-tech.com.hk (SSL Active, Ownership Active) |
+| WordPress 圖片訪問 | ✅ 正常 | VPS 本地存儲 + Cloudflare CDN 自動加速 |
+| R2 上傳功能 | ⏸️ 暫停 | Plugin 依賴 Workers API（已暫停） |
+| CDN 加速 | ✅ 有效 | Cloudflare 自動 cache (max-age=16070400) |
+
+#### 現有架構
+
+```
+WordPress (VPS) → 用戶
+    ↓
+/wp-content/uploads/* (本地存儲)
+    ↓
+Cloudflare CDN (自動 cache 186 天)
+    ↓
+用戶瀏覽器
+```
+
+#### 測試證據
+
+- `curl https://aplus-tech.com.hk/wp-content/uploads/woocommerce-placeholder.png`
+  - HTTP 200 OK
+  - cf-cache-status: MISS (首次訪問)
+  - Cache-Control: public, max-age=16070400
+  - Server: cloudflare
+
+#### 決策
+
+**保持現狀**：VPS 本地圖片 + Cloudflare CDN 自動加速
+- ✅ 架構簡單（零維護成本）
+- ✅ CDN 自動生效（186 天 cache）
+- ✅ 符合架構決策（方案 B：R2 + Cloudflare CDN，但 R2 暫時唔需要）
+- ⏸️ R2 上傳功能暫停（Workers API 已暫停）
+
+**Phase C 完成**：C.0 (VPS 狀態檢查) ✅ + C.4 (R2 驗證) ✅
+**Phase D 準備中**：新功能整合（WhatsApp Bot, n8n 自動化）
+
+---
+
 ### 🔴 架構決策：暫停 Workers/KV/D1 計劃（2026-01-24 23:30 UTC）
 
 #### 決策摘要
@@ -443,8 +487,8 @@ npx wrangler kv key list --namespace-id 695adac89df4448e81b9ffc05f639491 --prefi
 |-------|------|------|------|
 | **Phase A** | VPS 遷移準備 | ✅ 完成 | VPS 診斷完成（2026-01-20）|
 | **Phase B** | 基礎服務部署 | ✅ 完成 | Docker Compose 優化 + Redis 部署（2026-01-21）|
-| **Phase C** | 功能保留驗證 | ⏸️ 部分暫停 | C.0 完成，C.1-C.3 暫停（Workers 架構暫停）|
-| **Phase D** | 新功能整合 | 待開始 | WhatsApp Bot + CRM + 會計系統 + 內容行銷自動化 |
+| **Phase C** | 功能保留驗證 | ✅ 完成 | C.0+C.4 完成（2026-01-25），C.1-C.3 暫停（Workers 架構暫停）|
+| **Phase D** | 新功能整合 | 🔄 準備中 | WhatsApp Bot + CRM + 會計系統 + 內容行銷自動化 |
 | **Phase E** | Cache Warming | ⏸️ 暫停 | 已暫停（KV Cache 架構暫停）|
 
 #### 🎯 核心目標

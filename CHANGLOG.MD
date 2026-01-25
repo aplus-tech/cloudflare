@@ -12,6 +12,45 @@
 | 23:30 UTC | 架構決策：暫停 Workers/KV/D1，只保留 R2 CDN ✅ | docs/ARCHITECTURE_ISSUES.md |
 | 23:00 UTC | Phase 5.0 Phase C：新 VPS 狀態檢查 ✅ | 檢查結果記錄於下方 |
 
+## 2026-01-25
+
+### 完成 Completed
+| 時間 | 改動 | 來源證據 |
+|------|------|---------|
+| 00:10 UTC | Phase 5.0 Phase C.4：R2 驗證測試完成 ✅ | VPS 圖片 + Cloudflare CDN 正常運作 |
+
+#### Phase C.4：R2 媒體存儲驗證
+
+**【問題原因】**
+- R2 bucket 空的，現有 Plugin 依賴 Workers API（已暫停）
+- 需要驗證圖片訪問是否正常
+
+**【方案成立】**
+- 保持現狀：VPS 本地圖片 + Cloudflare CDN 自動加速
+- R2 Custom Domain 已設定（media.aplus-tech.com.hk）但未使用
+- WordPress 圖片透過 aplus-tech.com.hk/wp-content/uploads/* 訪問
+- Cloudflare 自動 cache（Cache-Control: max-age=16070400 = 186 天）
+
+**【來源證據】**
+- R2 Custom Domain 檢查：SSL Active, Ownership Active
+- 圖片訪問測試：cf-cache-status: MISS → 自動 CDN cache
+- VPS Docker 容器狀態：7 個容器正常運行（Up 2 days）
+- WordPress Plugin 檢查：cloudflare-wordpress-db-sync 已安裝（但依賴 Workers）
+
+**【驗證結果】**
+| 項目 | 狀態 | 結果 |
+|------|------|------|
+| R2 Custom Domain | ✅ 已設定 | media.aplus-tech.com.hk (SSL Active) |
+| WordPress 圖片訪問 | ✅ 正常 | VPS 本地 + Cloudflare CDN |
+| R2 上傳功能 | ⏸️ 暫停 | 依賴 Workers API（已暫停） |
+| CDN 加速 | ✅ 有效 | Cloudflare 自動 cache |
+
+**【結論】**
+- Phase C.4 驗證通過
+- 現有架構（VPS + Cloudflare CDN）滿足需求
+- R2 上傳功能暫時唔需要（Workers 架構已暫停）
+- Phase C 完成，準備進入 Phase D（新功能整合）
+
 #### 架構決策：暫停 Workers/KV/D1 計劃
 
 **【問題原因】**
