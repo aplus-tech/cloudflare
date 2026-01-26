@@ -31,18 +31,38 @@ priority_docs:
 
 # 當前狀態追蹤（AI 自動識別用）
 current_status:
-  last_confirmed: "2026-01-19"
+  last_confirmed: "2026-01-25"
   confirmed_by: "user"
   current_focus:
-    phase: "5.0"
-    task: "VPS 遷移與 AI 自動化整合"
-    next_step: "Phase A - VPS 遷移準備（DNS + Docker 遷移）"
-    user_note: "完整 5-phase 計劃詳見 .ai/IDEAS.md#Phase-5-8-Overview"
+    phase: "5.0 Phase D"
+    task: "新功能整合（Svelte + D1 統一平台）"
+    next_step: "建立 D1 Database Schema（26 表）"
+    user_note: "Phase A/B/C 完成（2026-01-25），開始 Phase D 整合 WhatsApp Bot + 會計 + 內容行銷"
+
+  completed_phases:
+    - phase: "5.0 Phase A"
+      task: "VPS 遷移準備"
+      completed: "2026-01-20"
+      result: "VPS 診斷完成（2 CPU / 15GB RAM / 193GB Storage）"
+
+    - phase: "5.0 Phase B"
+      task: "基礎服務部署"
+      completed: "2026-01-21"
+      result: "Docker Compose 優化 + Redis 部署完成"
+
+    - phase: "5.0 Phase C"
+      task: "功能保留驗證"
+      completed: "2026-01-25"
+      result: "C.0 VPS 狀態檢查 + C.4 R2 驗證完成（C.1-C.3 暫停 - Workers 架構暫停）"
 
   on_hold_tasks:
     - phase: "4.7"
       task: "安全與效能優化（Cache Warming + 移除明文密碼）"
       reason: "Phase 5.0 VPS 遷移優先，Phase 4.7 將在新 VPS 環境完成"
+
+    - phase: "5.0 Phase E"
+      task: "Cache Warming + 測試"
+      reason: "KV Cache 架構暫停（2026-01-24 架構決策）"
 
 # 代碼風格
 code_style:
