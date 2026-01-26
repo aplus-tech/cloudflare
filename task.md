@@ -496,11 +496,90 @@ SELECT * FROM wp_options WHERE option_name IN ('siteurl', 'home');
 - [ ] 建立 D1 Accounting Schema（accounting_chart, accounting_entries, accounting_reports）
 - [ ] n8n 自動化流程（上傳圖片 → OCR → D1 記錄 → 生成報表）
 
-### D.3 內容行銷自動化（Crawler → WordPress → Social Media）
-- [ ] n8n 定時爬取供應商網站
-- [ ] Claude/Gemini AI 改寫內容（SEO 優化）
-- [ ] WordPress REST API 發布文章
-- [ ] Facebook/Instagram Graph API 發布帖文
+### D.3 內容行銷自動化（Scraper + AI + WordPress）
+
+**目標**：整合內容爬蟲系統到 Svelte + Cloudflare 統一平台
+
+#### 完整工作流程（7 步驟）
+
+**Step 1: 內容缺口分析**
+- [ ] Svelte UI: `/admin/content-gap`
+- [ ] 分析 GSC + WordPress 數據找出高價值關鍵字缺口
+- [ ] D1 查詢: `search_performance`, `products`, `posts`
+
+**Step 2-3: 爬蟲執行**
+- [ ] Svelte UI: 輸入供應商 URL
+- [ ] POST `/api/scraper/scrape`
+- [ ] Workers: 提取標題、內容、圖片、規格
+- [ ] 儲存原始數據到 D1
+
+**Step 4: AI 改寫**
+- [ ] POST `/api/scraper/rewrite`
+- [ ] 調用 OpenAI GPT-4o（目標關鍵字 + SEO 優化 + 香港繁體 + 800 字）
+- [ ] 返回改寫後 HTML 內容
+
+**Step 5: 內容預覽與編輯**
+- [ ] Svelte UI: Rich Text Editor
+- [ ] 儲存到 D1: `content_drafts` 表
+
+**Step 6: n8n 通知**
+- [ ] Workers: 觸發 n8n Webhook
+- [ ] n8n: 發送 Email + WAHA (WhatsApp) 通知
+
+**Step 7: 確認發布**
+- [ ] POST `/api/scraper/publish`
+- [ ] 調用 WordPress REST API（發布為 Draft 狀態）
+- [ ] 更新 D1: `content_gaps` (status = published)
+
+#### 新增文件結構
+
+**Svelte 路由**（`src/routes/admin/scraper/`）：
+- [ ] `+page.svelte` - 爬蟲管理主頁
+- [ ] `new/+page.svelte` - 新建爬蟲任務
+- [ ] `[id]/+page.svelte` - 查看結果
+- [ ] `[id]/edit/+page.svelte` - 編輯內容
+
+**API Endpoints**（`src/routes/api/scraper/`）：
+- [ ] `analyze-gap/+server.ts` - 內容缺口分析
+- [ ] `scrape/+server.ts` - 執行爬蟲
+- [ ] `rewrite/+server.ts` - AI 改寫
+- [ ] `save-draft/+server.ts` - 儲存草稿
+- [ ] `publish/+server.ts` - 發布到 WordPress
+
+**核心模組**（`src/lib/scraper/`）：
+- [ ] `gap-analyzer.ts` - 內容缺口分析邏輯
+- [ ] `supplier-crawler.ts` - 供應商爬蟲引擎
+- [ ] `ai-rewriter.ts` - OpenAI 整合
+- [ ] `wp-publisher.ts` - WordPress 發布器
+- [ ] `types.ts` - TypeScript 類型
+
+#### 實施計劃（3 週）
+
+**Week 1: 基礎架構**
+- [ ] 建立 Svelte 路由結構
+- [ ] 建立 API endpoints
+- [ ] 測試基本爬蟲功能
+
+**Week 2: 核心功能**
+- [ ] 實作供應商爬蟲引擎
+- [ ] 整合 OpenAI API
+- [ ] 實作 WordPress 發布
+- [ ] UI 完善（Rich Text Editor）
+
+**Week 3: 自動化流程**
+- [ ] 整合 n8n Webhook
+- [ ] Email + WAHA 通知
+- [ ] 完整流程測試
+
+#### 待討論
+- 爬蟲目標網站（Ubiquiti 官網？競爭對手？）
+- 爬蟲頻率（手動觸發？定時自動？）
+- 法律合規（robots.txt, Terms of Service）
+
+**【來源證據】**：
+- WP_Content_System/ - 現有 Python 內容系統
+- D1_DATABASE_SCHEMA.md - 完整 26 表定義（`content_gaps`, `content_drafts`）
+- SYSTEM_ARCHITECTURE.md - 統一架構設計
 
 **【來源證據】**：
 - .ai/IDEAS.md:1273-1409（Phase D 新功能整合）

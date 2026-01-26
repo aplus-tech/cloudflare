@@ -1845,6 +1845,652 @@ function aplus_d1_sync($post_id) {
 
 ---
 
+## 10.7 Phase D.3 內容行銷自動化（Scraper + AI + WordPress）
+
+### 10.7.1 系統概覽
+
+【問題原因】
+現有 WordPress 內容創建流程：
+- 手動搜集供應商資料
+- 手動撰寫產品介紹
+- 需要 SEO 專業知識
+- 時間成本高（1 篇文章需 2-3 小時）
+
+【方案成立】
+用 Svelte + OpenAI + n8n 實現自動化：
+- 爬蟲自動抓取供應商網站內容
+- OpenAI GPT-4o 改寫為 SEO 友好文章
+- n8n 通知用戶審核
+- WordPress REST API 自動發布
+
+【來源證據】
+- WP_Content_System/ - 現有 Python 內容系統（18 個模組）
+- ai_scraper_strategy.md - AI 爬蟲架構設計
+- D1_DATABASE_SCHEMA.md - `content_gaps`, `content_drafts` 表定義
+
+---
+
+### 10.7.2 完整工作流程
+
+```
+Step 1: 內容缺口分析
+  ↓ Svelte UI: /admin/content-gap
+  ↓ 分析 GSC + WordPress 數據
+  ↓ D1 查詢: search_performance, products, posts
+  返回：高價值關鍵字列表（keyword, ROI score, avg_position）
+
+Step 2: 選擇內容來源
+  ↓ 用戶選擇關鍵字
+  ↓ 選項：A. 爬取供應商網站 | B. 手動輸入 | C. 從草稿選擇
+
+Step 3: 爬蟲執行（選項 A）
+  ↓ Svelte UI: 輸入供應商 URL
+  ↓ POST /api/scraper/scrape
+  ↓ Workers: 調用爬蟲引擎
+  ↓ 提取：標題、內容、圖片、規格表
+  返回：原始內容 (JSON)
+
+Step 4: AI 改寫
+  ↓ POST /api/scraper/rewrite
+  ↓ 調用 OpenAI GPT-4o
+  ↓ Prompt: 目標關鍵字 + SEO 優化 + 香港繁體 + 800 字
+  返回：改寫後 HTML 內容
+
+Step 5: 內容預覽與編輯
+  ↓ Svelte UI: Rich Text Editor
+  ↓ 用戶編輯：標題、摘要、Meta Description
+  ↓ 儲存到 D1: content_drafts 表
+
+Step 6: n8n 通知
+  ↓ Workers: 觸發 n8n Webhook
+  ↓ n8n: 發送 Email + WAHA (WhatsApp) 通知
+  ↓ 用戶: 收到通知 → 進入 Svelte 審核
+
+Step 7: 確認發布
+  ↓ Svelte UI: 最終審核
+  ↓ POST /api/scraper/publish
+  ↓ 調用 WordPress REST API（發布為 Draft 狀態）
+  更新 D1: content_gaps (status = published)
+```
+
+---
+
+### 10.7.3 核心模組實作
+
+#### 步驟 1：建立 Gap Analyzer
+
+```typescript
+// src/lib/scraper/gap-analyzer.ts
+// [Source: WP_Content_System/gap_analyzer.py]
+
+export interface ContentGap {
+  keyword: string;
+  roi_score: number;
+  avg_position: number;
+  total_impressions: number;
+  coverage_status: 'uncovered' | 'partial' | 'covered';
+}
+
+export async function analyzeContentGaps(
+  db: D1Database,
+  minROI: number = 0.7
+): Promise<ContentGap[]> {
+  // 1. 獲取 GSC 高價值關鍵字
+  const gscData = await db.prepare(`
+    SELECT query, SUM(impressions) as total_impressions,
+           AVG(position) as avg_position
+    FROM search_performance
+    GROUP BY query
+    HAVING total_impressions > ?
+    ORDER BY total_impressions DESC
+    LIMIT 100
+  `).bind(100).all();
+
+  // 2. 檢查 WordPress 覆蓋
+  const gaps: ContentGap[] = [];
+  for (const item of gscData.results) {
+    const coverage = await checkWordPressCoverage(db, item.query);
+    if (!coverage || item.avg_position > 10) {
+      gaps.push({
+        keyword: item.query,
+        roi_score: calculateROI(item),
+        avg_position: item.avg_position,
+        total_impressions: item.total_impressions,
+        coverage_status: coverage ? 'partial' : 'uncovered'
+      });
+    }
+  }
+
+  return gaps;
+}
+
+async function checkWordPressCoverage(
+  db: D1Database,
+  keyword: string
+): Promise<boolean> {
+  const search = `%${keyword}%`;
+
+  const products = await db.prepare(
+    "SELECT COUNT(*) as count FROM products WHERE name LIKE ? OR Focus_Keyword LIKE ?"
+  ).bind(search, search).first();
+
+  const posts = await db.prepare(
+    "SELECT COUNT(*) as count FROM posts WHERE Page_Name LIKE ? OR Focus_Keyword LIKE ?"
+  ).bind(search, search).first();
+
+  return (products.count + posts.count) > 0;
+}
+```
+
+【來源證據】
+- WP_Content_System/gap_analyzer.py:31-156（原 Python 實作）
+
+---
+
+#### 步驟 2：建立 Supplier Crawler
+
+```typescript
+// src/lib/scraper/supplier-crawler.ts
+
+export interface ScrapedContent {
+  url: string;
+  title: string;
+  description: string;
+  content: string;
+  images: string[];
+  specs: Record<string, string>;
+}
+
+export async function scrapeSupplierPage(url: string): Promise<ScrapedContent> {
+  // 1. 獲取頁面
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AplusTech/1.0)' }
+  });
+
+  if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+
+  const html = await response.text();
+
+  // 2. 解析內容
+  return {
+    url,
+    title: extractTitle(html),
+    description: extractMetaDescription(html),
+    content: extractMainContent(html),
+    images: extractImages(html, url),
+    specs: extractSpecs(html)
+  };
+}
+
+function extractMainContent(html: string): string {
+  // 移除 script, style, nav, footer
+  let clean = html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '')
+    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '');
+
+  // 提取主要內容區域
+  const mainMatch = clean.match(
+    /<(?:main|article|div class="content")[^>]*>(.*?)<\/(?:main|article|div)>/is
+  );
+
+  return mainMatch
+    ? mainMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    : clean.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function extractImages(html: string, baseUrl: string): string[] {
+  const images: string[] = [];
+  const imgRegex = /<img[^>]+src="([^"]+)"/gi;
+  let match;
+
+  while ((match = imgRegex.exec(html)) !== null) {
+    let imgUrl = match[1];
+
+    // 處理相對路徑
+    if (!imgUrl.startsWith('http')) {
+      imgUrl = new URL(imgUrl, baseUrl).href;
+    }
+
+    // 過濾小圖標
+    if (!imgUrl.includes('icon') && !imgUrl.includes('logo')) {
+      images.push(imgUrl);
+    }
+  }
+
+  return [...new Set(images)]; // 去重
+}
+```
+
+【來源證據】
+- ai_scraper_strategy.md:162-204（爬蟲架構設計）
+
+---
+
+#### 步驟 3：建立 AI Rewriter
+
+```typescript
+// src/lib/scraper/ai-rewriter.ts
+
+export interface RewriteOptions {
+  targetKeyword: string;
+  wordCount?: number;
+  tone?: 'professional' | 'technical';
+}
+
+export async function rewriteContentWithOpenAI(
+  sourceContent: ScrapedContent,
+  options: RewriteOptions,
+  apiKey: string
+): Promise<RewrittenContent> {
+  const { targetKeyword, wordCount = 800, tone = 'professional' } = options;
+
+  const prompt = `
+你是專業的 SEO 內容寫手。請根據以下來源內容，撰寫一篇香港繁體中文的 SEO 友好文章。
+
+## 來源內容
+標題：${sourceContent.title}
+描述：${sourceContent.description}
+內容：${sourceContent.content.substring(0, 2000)}
+
+## 要求
+1. **目標關鍵字**：${targetKeyword}（自然融入 3-5 次）
+2. **字數**：約 ${wordCount} 字
+3. **語氣**：${tone === 'professional' ? '專業但易懂' : '技術性'}
+4. **結構**：H1 標題 + 3-5 個 H2 小標題 + UL 列表 + CTA
+5. **SEO 優化**：前 100 字出現關鍵字、本地化內容（香港市場）
+6. **格式**：完整 HTML
+
+## 輸出格式（JSON）
+{
+  "title": "文章標題（包含關鍵字）",
+  "excerpt": "摘要（150 字）",
+  "content": "完整 HTML 內容",
+  "meta_description": "SEO meta description（160 字內）",
+  "focus_keyword": "${targetKeyword}"
+}
+`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: '你是專業的 SEO 內容寫手。' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!response.ok) throw new Error(`OpenAI API failed: ${response.status}`);
+
+  const data = await response.json();
+  const result = JSON.parse(data.choices[0].message.content);
+
+  return {
+    ...result,
+    seo_score: calculateSEOScore(result, targetKeyword)
+  };
+}
+
+function calculateSEOScore(content: any, keyword: string): number {
+  let score = 0;
+
+  if (content.title.toLowerCase().includes(keyword.toLowerCase())) score += 20;
+  if (content.meta_description.toLowerCase().includes(keyword.toLowerCase())) score += 15;
+
+  const keywordCount = (content.content.toLowerCase().match(
+    new RegExp(keyword.toLowerCase(), 'g')
+  ) || []).length;
+
+  if (keywordCount >= 3 && keywordCount <= 7) score += 30;
+
+  const wordCount = content.content.replace(/<[^>]+>/g, '').length;
+  if (wordCount >= 600 && wordCount <= 1200) score += 20;
+
+  if (content.content.includes('<h2>')) score += 15;
+
+  return Math.min(score, 100);
+}
+```
+
+【來源證據】
+- WP_Content_System/idea_generator.py:16-145（原 AI 生成邏輯）
+
+---
+
+#### 步驟 4：建立 WordPress Publisher
+
+```typescript
+// src/lib/scraper/wp-publisher.ts
+
+export interface WordPressPost {
+  title: string;
+  content: string;
+  excerpt: string;
+  status: 'draft' | 'publish';
+  meta?: {
+    rank_math_focus_keyword?: string;
+    rank_math_description?: string;
+  };
+}
+
+export async function publishToWordPress(
+  post: WordPressPost,
+  wpUrl: string,
+  username: string,
+  appPassword: string
+): Promise<{ id: number; url: string }> {
+  const auth = btoa(`${username}:${appPassword}`);
+
+  const response = await fetch(`${wpUrl}/wp-json/wp/v2/posts`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(post)
+  });
+
+  if (!response.ok) {
+    throw new Error(`WordPress API failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // 更新 Rank Math meta
+  if (post.meta) {
+    await updateRankMathMeta(data.id, post.meta, wpUrl, auth);
+  }
+
+  return { id: data.id, url: data.link };
+}
+
+async function updateRankMathMeta(
+  postId: number,
+  meta: Record<string, string>,
+  wpUrl: string,
+  auth: string
+): Promise<void> {
+  await fetch(`${wpUrl}/wp-json/wp/v2/posts/${postId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ meta })
+  });
+}
+```
+
+【來源證據】
+- WP_Content_System/wp_publish.py:1-78（原 WordPress 發布邏輯）
+
+---
+
+### 10.7.4 API Endpoints 實作
+
+#### API 1: 內容缺口分析
+
+```typescript
+// src/routes/api/scraper/analyze-gap/+server.ts
+
+import type { RequestHandler } from './$types';
+import { analyzeContentGaps } from '$lib/scraper/gap-analyzer';
+
+export const GET: RequestHandler = async ({ platform }) => {
+  const gaps = await analyzeContentGaps(platform.env.DB, 0.7);
+
+  return new Response(JSON.stringify(gaps), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+};
+```
+
+#### API 2: 執行爬蟲
+
+```typescript
+// src/routes/api/scraper/scrape/+server.ts
+
+import type { RequestHandler } from './$types';
+import { scrapeSupplierPage } from '$lib/scraper/supplier-crawler';
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  const { url } = await request.json();
+
+  try {
+    const content = await scrapeSupplierPage(url);
+
+    // 儲存到 D1
+    await platform.env.DB.prepare(`
+      INSERT INTO content_drafts (title, content, status)
+      VALUES (?, ?, 'scraped')
+    `).bind(content.title, JSON.stringify(content)).run();
+
+    return new Response(JSON.stringify({ success: true, content }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+};
+```
+
+#### API 3: AI 改寫
+
+```typescript
+// src/routes/api/scraper/rewrite/+server.ts
+
+import type { RequestHandler } from './$types';
+import { rewriteContentWithOpenAI } from '$lib/scraper/ai-rewriter';
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  const { sourceContent, targetKeyword } = await request.json();
+
+  // 從 D1 settings 獲取 OpenAI API Key
+  const apiKey = await platform.env.DB.prepare(
+    "SELECT value FROM settings WHERE key = 'openai_api_key'"
+  ).first();
+
+  const rewritten = await rewriteContentWithOpenAI(
+    sourceContent,
+    { targetKeyword },
+    apiKey.value
+  );
+
+  // 儲存到 content_drafts
+  await platform.env.DB.prepare(`
+    INSERT INTO content_drafts (
+      title, content, excerpt, focus_keyword, meta_description, status
+    ) VALUES (?, ?, ?, ?, ?, 'rewritten')
+  `).bind(
+    rewritten.title,
+    rewritten.content,
+    rewritten.excerpt,
+    rewritten.focus_keyword,
+    rewritten.meta_description
+  ).run();
+
+  return new Response(JSON.stringify(rewritten), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+};
+```
+
+#### API 4: 發布到 WordPress
+
+```typescript
+// src/routes/api/scraper/publish/+server.ts
+
+import type { RequestHandler } from './$types';
+import { publishToWordPress } from '$lib/scraper/wp-publisher';
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  const { draftId } = await request.json();
+
+  // 從 D1 獲取草稿
+  const draft = await platform.env.DB.prepare(
+    "SELECT * FROM content_drafts WHERE id = ?"
+  ).bind(draftId).first();
+
+  // 從 D1 settings 獲取 WordPress 憑證
+  const wpUrl = await platform.env.DB.prepare(
+    "SELECT value FROM settings WHERE key = 'wp_url'"
+  ).first();
+
+  const wpUser = await platform.env.DB.prepare(
+    "SELECT value FROM settings WHERE key = 'wp_api_user'"
+  ).first();
+
+  const wpPass = await platform.env.DB.prepare(
+    "SELECT value FROM settings WHERE key = 'wp_api_password'"
+  ).first();
+
+  // 發布到 WordPress
+  const result = await publishToWordPress(
+    {
+      title: draft.title,
+      content: draft.content,
+      excerpt: draft.excerpt,
+      status: 'draft',
+      meta: {
+        rank_math_focus_keyword: draft.focus_keyword,
+        rank_math_description: draft.meta_description
+      }
+    },
+    wpUrl.value,
+    wpUser.value,
+    wpPass.value
+  );
+
+  // 更新 D1
+  await platform.env.DB.prepare(`
+    UPDATE content_drafts
+    SET status = 'published', published_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(draftId).run();
+
+  // 觸發 n8n Webhook
+  await fetch('https://n8n.example.com/webhook/content-published', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: draft.title,
+      url: result.url,
+      wp_post_id: result.id
+    })
+  });
+
+  return new Response(JSON.stringify(result), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+};
+```
+
+【來源證據】
+- WP_Content_System/ - 現有 18 個模組
+- SYSTEM_ARCHITECTURE.md:142-185（API 設計）
+
+---
+
+### 10.7.5 測試 Phase D.3
+
+#### 步驟 1：測試內容缺口分析
+
+```bash
+# 測試 API
+curl https://svelte.example.com/api/scraper/analyze-gap
+
+# 預期返回
+{
+  "gaps": [
+    {
+      "keyword": "UniFi AP",
+      "roi_score": 0.85,
+      "avg_position": 15.2,
+      "total_impressions": 1250,
+      "coverage_status": "uncovered"
+    }
+  ]
+}
+```
+
+#### 步驟 2：測試爬蟲功能
+
+```bash
+# 測試爬取 Ubiquiti 產品頁
+curl -X POST https://svelte.example.com/api/scraper/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://techspecs.ui.com/unifi/switching/usw-ultra"}'
+
+# 預期返回
+{
+  "success": true,
+  "content": {
+    "title": "UniFi Switch Ultra",
+    "description": "...",
+    "content": "...",
+    "images": ["url1", "url2"],
+    "specs": { "Ports": "60", "PoE": "2.5 GbE" }
+  }
+}
+```
+
+#### 步驟 3：測試 AI 改寫
+
+```bash
+# 測試 OpenAI 改寫
+curl -X POST https://svelte.example.com/api/scraper/rewrite \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceContent": {...},
+    "targetKeyword": "UniFi 交換器推薦"
+  }'
+
+# 預期返回
+{
+  "title": "UniFi 交換器推薦：Switch Ultra 完整評測",
+  "content": "<h1>UniFi 交換器推薦...</h1>...",
+  "excerpt": "...",
+  "meta_description": "...",
+  "seo_score": 85
+}
+```
+
+#### 步驟 4：測試 WordPress 發布
+
+```bash
+# 測試發布到 WordPress
+curl -X POST https://svelte.example.com/api/scraper/publish \
+  -H "Content-Type: application/json" \
+  -d '{"draftId": 123}'
+
+# 預期返回
+{
+  "id": 456,
+  "url": "https://aplus-tech.com.hk/unifi-switch-ultra-review"
+}
+
+# 驗證 WordPress
+# 訪問 WordPress 後台 → 文章 → 檢查新草稿
+```
+
+【來源證據】
+- WP_Content_System/run.sh - 原測試腳本
+- implementation_plan.md#11 (測試清單)
+
+---
+
 ## 11. 測試清單
 
 ### 11.1 DNS 測試
